@@ -1,49 +1,71 @@
 # JWT Decoder
 
-A VS Code extension for decoding JWT tokens — **100% locally**.
+A Visual Studio Code extension for viewing JWT token contents in a clear,
+readable format. Paste a token or select one in the editor to inspect its
+Header and Payload as readable JSON, with standard claims formatted for quick
+reading.
 
-## Privacy guarantee
+![The JWT Decoder panel showing a decoded synthetic token](media/screenshot.png)
 
-The token is **never sent anywhere**. Decoding happens exclusively inside a
-Webview sandbox with the following Content Security Policy (CSP):
+## Privacy
 
-```
-default-src 'none'; connect-src 'none'; img-src 'none'
-```
+No telemetry. No network requests. Tokens are never stored.
 
-`connect-src 'none'` physically blocks `fetch`, `XMLHttpRequest`, `WebSocket`
-and any other network request. The extension also has no runtime dependencies
-and no code that makes network connections.
+Decoding happens on your machine, inside a webview whose Content Security
+Policy blocks network access entirely (`default-src 'none'`,
+`connect-src 'none'`). The extension has no runtime dependencies, reads the
+clipboard only when you press the paste button, and does not retain any data
+after the panel is closed.
 
 ## Features
 
-- Live decoding of the **Header**, **Payload**, and **Signature** (as you type).
-- Readable formatting of standard claims:
-  - `exp` — expiration date + status (ważny / **WYGASŁ**),
-  - `iat` — issued-at date,
-  - `nbf` — not valid before (with a warning if not yet active),
-  - `iss`, `sub`, `aud`.
-- Correct UTF-8 decoding (base64url).
-- Matches the VS Code theme (light/dark).
+- Live decoding as you type or paste.
+- Header and Payload rendered as a collapsible JSON tree; the Signature
+  segment is displayed as-is.
+- Standard claims formatted where present: `exp`, `iat`, `nbf`, `iss`, `sub`,
+  `aud` — with UTC timestamps, relative times, and expiration status.
+- Correct Base64URL and UTF-8 handling, including non-Latin characters.
+- Follows the editor theme (light, dark, high contrast).
 
-> Note: the extension **does not verify the signature** — that would require
-> the key/secret. It only shows the token's contents.
+## What it does not do
+
+The extension does not verify signatures — that would require the signing key
+or secret. It decodes and displays token contents only. A decoded token tells
+you nothing about whether the token is authentic or trustworthy.
 
 ## Usage
 
-1. Command Palette (`Cmd/Ctrl+Shift+P`) → **JWT: Otwórz dekoder**.
-2. Paste a token and read the decoded contents.
+Open the Command Palette (`Ctrl/Cmd+Shift+P`), run **JWT: Open Decoder**, and
+paste a token into the input field.
 
-Or: select a token in the editor → right-click → **JWT: Dekoduj zaznaczony token**.
+To decode a token that is already in your editor: select it, right-click, and
+choose **JWT: Decode Selected Token**.
+
+## Installation
+
+Install "JWT Decoder" from the Visual Studio Code Marketplace, or download a
+`.vsix` from the repository's Releases page and install it via
+`Extensions: Install from VSIX...`.
+
+## Feedback and security
+
+- Bugs and feature requests: [GitHub Issues](https://github.com/Beata-Humeniuk/jwt-decoder/issues)
+- Security issues: see [SECURITY.md](SECURITY.md) — please never include real
+  tokens in reports.
 
 ## Development
 
 ```bash
 npm install
-npm run compile      # compile TypeScript -> out/
-npm run watch        # watch mode
-npm run package      # build the .vsix (vsce)
+npm run compile   # compile TypeScript to out/
+npm run watch     # compile in watch mode
+npm test          # run the test suite
+npm run package   # build the .vsix
 ```
 
-To run for testing: open the folder in VS Code and press `F5`
+To run the extension for testing, open this folder in VS Code and press `F5`
 (Extension Development Host).
+
+## License
+
+[MIT](LICENSE) — see also the [changelog](CHANGELOG.md).

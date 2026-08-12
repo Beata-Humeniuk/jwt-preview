@@ -1,14 +1,28 @@
 {
   "name": "jwt-decoder",
   "displayName": "JWT Decoder",
-  "description": "Dekodowanie JWT w 100% lokalnie. Token nigdy nie opuszcza Twojego komputera.",
-  "version": "0.1.0",
+  "description": "A clear, readable view of JWT token contents.",
+  "version": "1.0.0",
   "publisher": "beatahumeniuk",
+  "license": "MIT",
   "author": {
     "name": "Beata Humeniuk"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Beata-Humeniuk/jwt-decoder.git"
+  },
+  "homepage": "https://github.com/Beata-Humeniuk/jwt-decoder#readme",
+  "bugs": {
+    "url": "https://github.com/Beata-Humeniuk/jwt-decoder/issues"
+  },
   "engines": {
     "vscode": "^1.90.0"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
   },
   "icon": "media/icon.png",
   "categories": [
@@ -18,7 +32,10 @@
     "jwt",
     "token",
     "decode",
-    "json web token"
+    "json web token",
+    "offline",
+    "local",
+    "privacy"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
@@ -26,12 +43,12 @@
     "commands": [
       {
         "command": "jwtDecoder.open",
-        "title": "JWT: Otwórz dekoder",
+        "title": "Open Decoder",
         "category": "JWT"
       },
       {
         "command": "jwtDecoder.decodeSelection",
-        "title": "JWT: Dekoduj zaznaczony token",
+        "title": "Decode Selected Token",
         "category": "JWT"
       }
     ],
@@ -48,11 +65,14 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "npm run compile && npx --yes --loglevel=error @vscode/vsce@2.32.0 package"
+    "vscode:prepublish": "npm run compile",
+    "test": "tsc -p tsconfig.test.json && node --test \"out-test/test/**/*.test.js\"",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "2.32.0",
     "typescript": "^5.3.0"
   }
 }

@@ -1,4 +1,14 @@
+import * as crypto from 'crypto';
 import * as vscode from 'vscode';
+import {
+  base64UrlDecode,
+  escapeHtml,
+  fmtDate,
+  fmtRel,
+  jsonToHtml,
+  parseToken,
+  renderClaims
+} from './webviewLogic';
 
 let panel: vscode.WebviewPanel | undefined;
 
@@ -18,6 +28,9 @@ export function activate(context: vscode.ExtensionContext) {
 function openPanel(initialToken?: string) {
   if (panel) {
     panel.reveal(vscode.ViewColumn.Beside);
+    if (initialToken) {
+      panel.webview.postMessage({ type: 'setToken', token: initialToken });
+    }
   } else {
     panel = vscode.window.createWebviewPanel(
       'jwtDecoder',
@@ -25,27 +38,19 @@ function openPanel(initialToken?: string) {
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
-        retainContextWhenHidden: true
+        retainContextWhenHidden: true,
+        localResourceRoots: []
       }
     );
-    panel.webview.html = getHtml();
+    panel.webview.html = getHtml(initialToken);
     panel.onDidDispose(() => {
       panel = undefined;
     });
   }
-
-  if (initialToken) {
-    panel.webview.postMessage({ type: 'setToken', token: initialToken });
-  }
 }
 
 function getNonce(): string {
-  let text = '';
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
+  return crypto.randomBytes(16).toString('base64');
 }
 
 const styles = `
@@ -59,6 +64,10 @@ const styles = `
       margin: 0;
     }
     h2 { margin: 0 0 4px 0; }
+    :focus-visible {
+      outline: 2px solid var(--vscode-focusBorder, #007fd4);
+      outline-offset: 1px;
+    }
     textarea {
       width: 100%;
       box-sizing: border-box;
@@ -198,7 +207,22 @@ const styles = `
     .hidden { display: none; }
 `;
 
-const script = `
+function getSharedFunctionSources(): string {
+  return [
+    escapeHtml,
+    base64UrlDecode,
+    parseToken,
+    jsonToHtml,
+    fmtDate,
+    fmtRel,
+    renderClaims
+  ].map(fn => fn.toString()).join('\n\n');
+}
+
+function getScript(): string {
+  return `
+    ${getSharedFunctionSources()}
+
     const input = document.getElementById('input');
     const errorBox = document.getElementById('error');
     const result = document.getElementById('result');
@@ -206,39 +230,6 @@ const script = `
     const payloadEl = document.getElementById('payload');
     const signatureEl = document.getElementById('signature');
     const claimsEl = document.getElementById('claims');
-
-    function base64UrlDecode(str) {
-      let s = str.replace(/-/g, '+').replace(/_/g, '/');
-      while (s.length % 4) { s += '='; }
-      const binary = atob(s);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
-      return new TextDecoder('utf-8').decode(bytes);
-    }
-
-    function jsonToHtml(value, keyHtml) {
-      if (value === null || typeof value !== 'object') {
-        const isString = typeof value === 'string';
-        const cls = isString ? 'jstr' : (typeof value === 'number' ? 'jnum' : 'jlit');
-        const text = isString ? '"' + escapeHtml(value) + '"' : String(value);
-        return '<div class="jrow">' + keyHtml + '<span class="' + cls + '">' + text + '</span></div>';
-      }
-      const isArr = Array.isArray(value);
-      const open = isArr ? '[' : '{';
-      const close = isArr ? ']' : '}';
-      const entries = isArr ? value.map(v => [null, v]) : Object.entries(value);
-      if (entries.length === 0) {
-        return '<div class="jrow">' + keyHtml + open + close + '</div>';
-      }
-      const inner = entries.map(([k, v]) =>
-        jsonToHtml(v, k === null ? '' : '<span class="jkey">"' + escapeHtml(k) + '"</span>: ')
-      ).join('');
-      return '<details class="jnode" open>' +
-        '<summary data-close="' + close + '">' + keyHtml + open + '</summary>' +
-        '<div class="jkids">' + inner + '</div>' +
-        '<div class="jrow">' + close + '</div>' +
-        '</details>';
-    }
 
     function renderJsonInto(el, jsonStr) {
       try {
@@ -248,70 +239,6 @@ const script = `
       }
     }
 
-    function fmtDate(sec) {
-      try {
-        const d = new Date(sec * 1000);
-        return d.toISOString().replace('T', ' ').replace('.000Z', ' UTC');
-      } catch (e) { return String(sec); }
-    }
-
-    function fmtRel(sec, now) {
-      let d = sec - now;
-      const future = d >= 0;
-      d = Math.abs(d);
-      let txt;
-      if (d < 60) { txt = d + ' s'; }
-      else if (d < 3600) { txt = Math.round(d / 60) + ' min'; }
-      else if (d < 86400) { txt = Math.round(d / 3600) + ' godz.'; }
-      else if (d < 31536000) {
-        const days = Math.round(d / 86400);
-        txt = days === 1 ? '1 dzień' : days + ' dni';
-      } else {
-        const y = Math.round(d / 31536000);
-        const last = y % 10, tens = y % 100;
-        txt = y + (y === 1 ? ' rok' : (last >= 2 && last <= 4 && (tens < 12 || tens > 14) ? ' lata' : ' lat'));
-      }
-      return future ? 'za ' + txt : txt + ' temu';
-    }
-
-    function renderClaims(payloadObj) {
-      const rows = [];
-      const now = Math.floor(Date.now() / 1000);
-
-      function row(key, label, valueHtml) {
-        rows.push('<div class="claim-row"><span class="claim-key">' + key + '</span>' +
-          '<span class="claim-name">' + label + '</span>' +
-          '<span class="claim-val">' + valueHtml + '</span></div>');
-      }
-      function dateVal(sec) {
-        return fmtDate(sec) + ' <span class="claim-sub">(' + fmtRel(sec, now) + ')</span>';
-      }
-
-      if (typeof payloadObj.exp === 'number') {
-        const expired = payloadObj.exp < now;
-        row('exp', 'wygasa', dateVal(payloadObj.exp) +
-          '<span class="pill ' + (expired ? 'err">wygasł' : 'ok">ważny') + '</span>');
-      }
-      if (typeof payloadObj.iat === 'number') {
-        row('iat', 'wydany', dateVal(payloadObj.iat));
-      }
-      if (typeof payloadObj.nbf === 'number') {
-        row('nbf', 'ważny od', dateVal(payloadObj.nbf) +
-          (payloadObj.nbf > now ? '<span class="pill warn">jeszcze nieaktywny</span>' : ''));
-      }
-      if (payloadObj.iss !== undefined) { row('iss', 'wystawca', escapeHtml(String(payloadObj.iss))); }
-      if (payloadObj.sub !== undefined) { row('sub', 'podmiot', escapeHtml(String(payloadObj.sub))); }
-      if (payloadObj.aud !== undefined) {
-        row('aud', 'odbiorca', escapeHtml(Array.isArray(payloadObj.aud) ? payloadObj.aud.join(', ') : String(payloadObj.aud)));
-      }
-
-      return rows.length ? '<div class="claims-box">' + rows.join('') + '</div>' : '';
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
-
     function showError(msg) {
       errorBox.textContent = msg;
       errorBox.classList.remove('hidden');
@@ -319,33 +246,31 @@ const script = `
     }
 
     function decode() {
-      const raw = input.value.trim();
-      if (!raw) {
+      const parsed = parseToken(input.value);
+      if (parsed.kind === 'empty') {
         errorBox.classList.add('hidden');
         result.classList.add('hidden');
         return;
       }
-      const parts = raw.split('.');
-      if (parts.length < 2 || parts.length > 3) {
-        showError('To nie wygląda na JWT — oczekiwano 2–3 części rozdzielonych kropką.');
+      if (parsed.kind === 'invalid') {
+        showError("This doesn't look like a JWT — expected 2–3 parts separated by a dot.");
         return;
       }
-      try {
-        const headerStr = base64UrlDecode(parts[0]);
-        const payloadStr = base64UrlDecode(parts[1]);
-        renderJsonInto(headerEl, headerStr);
-        renderJsonInto(payloadEl, payloadStr);
-        signatureEl.textContent = parts[2] || '(brak podpisu)';
-
-        let claimsHtml = '';
-        try { claimsHtml = renderClaims(JSON.parse(payloadStr)); } catch (e) {}
-        claimsEl.innerHTML = claimsHtml;
-
-        errorBox.classList.add('hidden');
-        result.classList.remove('hidden');
-      } catch (e) {
-        showError('Nie udało się zdekodować tokenu: ' + (e && e.message ? e.message : e));
+      if (parsed.kind === 'error') {
+        showError('Failed to decode the token: ' + parsed.message);
+        return;
       }
+      renderJsonInto(headerEl, parsed.headerStr);
+      renderJsonInto(payloadEl, parsed.payloadStr);
+      signatureEl.textContent = parsed.signature || '(no signature)';
+
+      const now = Math.floor(Date.now() / 1000);
+      let claimsHtml = '';
+      try { claimsHtml = renderClaims(JSON.parse(parsed.payloadStr), now); } catch (e) {}
+      claimsEl.innerHTML = claimsHtml;
+
+      errorBox.classList.add('hidden');
+      result.classList.remove('hidden');
     }
 
     const jsonBoxes = { header: headerEl, payload: payloadEl };
@@ -368,7 +293,7 @@ const script = `
         input.value = text.trim();
         decode();
       } catch (e) {
-        showError('Brak dostępu do schowka — wklej token ręcznie (Ctrl/Cmd+V).');
+        showError('No clipboard access — paste the token manually (Ctrl/Cmd+V).');
       }
     });
 
@@ -380,10 +305,12 @@ const script = `
       }
     });
 
+    decode();
     input.focus();
 `;
+}
 
-function getHtml(): string {
+export function getHtml(initialToken?: string): string {
   const nonce = getNonce();
   const csp = [
     `default-src 'none'`,
@@ -394,7 +321,7 @@ function getHtml(): string {
   ].join('; ');
 
   return `<!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
@@ -405,26 +332,26 @@ function getHtml(): string {
 <body>
   <h2>JWT Decoder</h2>
 
-  <textarea id="input" placeholder="Wklej token JWT" spellcheck="false"></textarea>
+  <textarea id="input" placeholder="Paste a JWT token" aria-label="Paste a JWT token" spellcheck="false">${initialToken ? escapeHtml(initialToken) : ''}</textarea>
   <div class="toolbar">
-    <button id="paste" class="secondary">Wklej i dekoduj</button>
-    <button id="clear" class="secondary">Wyczyść</button>
+    <button id="paste" class="secondary">Paste &amp; decode</button>
+    <button id="clear" class="secondary">Clear</button>
   </div>
 
-  <div id="error" class="error-box hidden"></div>
+  <div id="error" class="error-box hidden" role="alert"></div>
 
   <div id="result" class="hidden">
     <div class="section header">
       <h3>Header
-        <button class="mini" data-target="header" data-open="true">Rozwiń wszystko</button>
-        <button class="mini" data-target="header" data-open="false">Zwiń wszystko</button>
+        <button class="mini" data-target="header" data-open="true">Expand all</button>
+        <button class="mini" data-target="header" data-open="false">Collapse all</button>
       </h3>
       <div class="jsonbox" id="header"></div>
     </div>
     <div class="section payload">
       <h3>Payload
-        <button class="mini" data-target="payload" data-open="true">Rozwiń wszystko</button>
-        <button class="mini" data-target="payload" data-open="false">Zwiń wszystko</button>
+        <button class="mini" data-target="payload" data-open="true">Expand all</button>
+        <button class="mini" data-target="payload" data-open="false">Collapse all</button>
       </h3>
       <div class="jsonbox" id="payload"></div>
       <div class="claims" id="claims"></div>
@@ -435,7 +362,7 @@ function getHtml(): string {
     </div>
   </div>
 
-  <script nonce="${nonce}">${script}  </script>
+  <script nonce="${nonce}">${getScript()}  </script>
 </body>
 </html>`;
 }
