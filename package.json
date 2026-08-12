@@ -1,0 +1,58 @@
+{
+  "name": "jwt-decoder",
+  "displayName": "JWT Decoder",
+  "description": "Dekodowanie JWT w 100% lokalnie. Token nigdy nie opuszcza Twojego komputera.",
+  "version": "0.1.0",
+  "publisher": "beatahumeniuk",
+  "author": {
+    "name": "Beata Humeniuk"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "icon": "media/icon.png",
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "jwt",
+    "token",
+    "decode",
+    "json web token"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "jwtDecoder.open",
+        "title": "JWT: Otwórz dekoder",
+        "category": "JWT"
+      },
+      {
+        "command": "jwtDecoder.decodeSelection",
+        "title": "JWT: Dekoduj zaznaczony token",
+        "category": "JWT"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "jwtDecoder.decodeSelection",
+          "when": "editorHasSelection",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npm run compile && npx --yes --loglevel=error @vscode/vsce@2.32.0 package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.3.0"
+  }
+}
