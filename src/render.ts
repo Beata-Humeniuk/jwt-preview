@@ -53,6 +53,16 @@ export function fmtRel(sec: number, now: number): string {
   return future ? 'in ' + txt : txt + ' ago';
 }
 
+export function claimValidityPill(key: string, value: number, now: number): string {
+  if (key === 'exp') {
+    return value < now ? '<span class="pill err">expired</span>' : '<span class="pill ok">valid</span>';
+  }
+  if (key === 'nbf' && value > now) {
+    return '<span class="pill warn">not yet active</span>';
+  }
+  return '';
+}
+
 export function renderClaims(payloadObj: Record<string, unknown>, now: number): string {
   const rows: string[] = [];
 
@@ -66,16 +76,13 @@ export function renderClaims(payloadObj: Record<string, unknown>, now: number): 
   }
 
   if (typeof payloadObj.exp === 'number') {
-    const expired = payloadObj.exp < now;
-    row('exp', 'expires', dateVal(payloadObj.exp) +
-      '<span class="pill ' + (expired ? 'err">expired' : 'ok">valid') + '</span>');
+    row('exp', 'expires', dateVal(payloadObj.exp) + claimValidityPill('exp', payloadObj.exp, now));
   }
   if (typeof payloadObj.iat === 'number') {
     row('iat', 'issued', dateVal(payloadObj.iat));
   }
   if (typeof payloadObj.nbf === 'number') {
-    row('nbf', 'valid from', dateVal(payloadObj.nbf) +
-      (payloadObj.nbf > now ? '<span class="pill warn">not yet active</span>' : ''));
+    row('nbf', 'valid from', dateVal(payloadObj.nbf) + claimValidityPill('nbf', payloadObj.nbf, now));
   }
   if (payloadObj.iss !== undefined) { row('iss', 'issuer', escapeHtml(String(payloadObj.iss))); }
   if (payloadObj.sub !== undefined) { row('sub', 'subject', escapeHtml(String(payloadObj.sub))); }
@@ -134,15 +141,8 @@ export function renderPlain(value: unknown, now: number): string {
     return entries.map(([k, v]) => {
       const label = topLevel ? (friendlyNames[k] || k) : k;
       if (topLevel && typeof v === 'number' && (k === 'exp' || k === 'iat' || k === 'nbf')) {
-        let pill = '';
-        if (k === 'exp') {
-          pill = v < now ? '<span class="pill err">expired</span>' : '<span class="pill ok">valid</span>';
-        }
-        if (k === 'nbf' && v > now) {
-          pill = '<span class="pill warn">not yet active</span>';
-        }
         return row(label, escapeHtml(fmtDate(v)) +
-          ' <span class="psub">(' + escapeHtml(fmtRel(v, now)) + ')</span>' + pill);
+          ' <span class="psub">(' + escapeHtml(fmtRel(v, now)) + ')</span>' + claimValidityPill(k, v, now));
       }
       if (Array.isArray(v) && v.every(isPrimitive)) {
         return row(label, escapeHtml(v.map(fmtValue).join(', ')));

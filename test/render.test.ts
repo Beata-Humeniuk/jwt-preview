@@ -1,8 +1,16 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from '../src/render';
+import { claimValidityPill, escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from '../src/render';
 
 const NOW = 1700000000;
+
+test('claimValidityPill covers exp and nbf, ignores other keys', () => {
+  assert.ok(claimValidityPill('exp', NOW - 1, NOW).includes('expired'));
+  assert.ok(claimValidityPill('exp', NOW + 1, NOW).includes('valid'));
+  assert.ok(claimValidityPill('nbf', NOW + 1, NOW).includes('not yet active'));
+  assert.equal(claimValidityPill('nbf', NOW - 1, NOW), '');
+  assert.equal(claimValidityPill('iat', NOW, NOW), '');
+});
 
 test('large payload renders without hanging', () => {
   const large: Record<string, string> = {};

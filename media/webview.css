@@ -207,7 +207,11 @@ button.mini {
   outline: 2px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: 1px;
 }
-.view-plain { display: none; }
+.view-plain {
+  display: none;
+  font-family: var(--vscode-font-family);
+  line-height: 1.5;
+}
 .plain-mode .view-plain { display: block; }
 .plain-mode .view-json { display: none; }
 .plain-mode .claims { display: none; }
@@ -241,10 +245,6 @@ button.copybtn:hover {
   color: var(--vscode-testing-iconPassed, #3fb950);
 }
 .copybtn.copied { opacity: 1; }
-.view-plain {
-  font-family: var(--vscode-font-family);
-  line-height: 1.5;
-}
 .prow {
   display: grid;
   grid-template-columns: 160px 1fr;

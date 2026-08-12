@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from './render';
+import { claimValidityPill, escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from './render';
 import { base64UrlDecode, parseToken } from './token';
 
 let panel: vscode.WebviewPanel | undefined;
@@ -74,6 +74,7 @@ const SHARED_WEBVIEW_FUNCTIONS = [
   jsonToHtml,
   fmtDate,
   fmtRel,
+  claimValidityPill,
   renderClaims,
   renderPlain
 ];

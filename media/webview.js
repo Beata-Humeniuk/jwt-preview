@@ -8,6 +8,7 @@ const payloadPlainEl = document.getElementById('payload-plain');
 const signatureEl = document.getElementById('signature');
 const claimsEl = document.getElementById('claims');
 const viewMode = document.getElementById('viewmode');
+let currentStrs = { header: '', payload: '' };
 
 function renderJsonInto(el, jsonStr) {
   try {
@@ -30,8 +31,6 @@ function showError(msg) {
   errorBox.classList.remove('hidden');
   result.classList.add('hidden');
 }
-
-let currentStrs = { header: '', payload: '' };
 
 function decode() {
   const parsed = parseToken(input.value);
