@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the latest published version of JWT Decoder receives security fixes.
+Only the latest published version of JWT Preview receives security fixes.
 
 ## Reporting a vulnerability
 
@@ -22,7 +22,7 @@ When reporting:
 
 ## Scope notes
 
-JWT Decoder decodes token contents locally. It makes no network requests,
+JWT Preview decodes token contents locally. It makes no network requests,
 stores no tokens, and does not verify signatures. Reports about the absence of
 signature verification are out of scope — it is a documented design decision,
 not a defect.

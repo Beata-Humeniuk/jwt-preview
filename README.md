@@ -1,11 +1,11 @@
-# JWT Decoder
+# JWT Preview
 
 A Visual Studio Code extension for viewing JWT token contents in a clear,
 readable format. Paste a token or select one in the editor to inspect its
 Header and Payload as readable JSON, with standard claims formatted for quick
 reading.
 
-![The JWT Decoder panel showing a decoded synthetic token](media/screenshot.png)
+![The JWT Preview panel showing a decoded synthetic token](media/screenshot.png)
 
 ## Privacy
 
@@ -35,7 +35,7 @@ you nothing about whether the token is authentic or trustworthy.
 
 ## Usage
 
-Open the Command Palette (`Ctrl/Cmd+Shift+P`), run **JWT: Open Decoder**, and
+Open the Command Palette (`Ctrl/Cmd+Shift+P`), run **JWT: Open Preview**, and
 paste a token into the input field.
 
 To decode a token that is already in your editor: select it, right-click, and
@@ -43,13 +43,13 @@ choose **JWT: Decode Selected Token**.
 
 ## Installation
 
-Install "JWT Decoder" from the Visual Studio Code Marketplace, or download a
+Install "JWT Preview" from the Visual Studio Code Marketplace, or download a
 `.vsix` from the repository's Releases page and install it via
 `Extensions: Install from VSIX...`.
 
 ## Feedback and security
 
-- Bugs and feature requests: [GitHub Issues](https://github.com/Beata-Humeniuk/jwt-decoder/issues)
+- Bugs and feature requests: [GitHub Issues](https://github.com/Beata-Humeniuk/jwt-preview/issues)
 - Security issues: see [SECURITY.md](SECURITY.md) — please never include real
   tokens in reports.
 

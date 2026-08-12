@@ -1,6 +1,6 @@
 {
-  "name": "jwt-decoder",
-  "displayName": "JWT Decoder",
+  "name": "jwt-preview",
+  "displayName": "JWT Preview",
   "description": "A clear, readable view of JWT token contents.",
   "version": "1.0.0",
   "publisher": "beatahumeniuk",
@@ -10,11 +10,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Beata-Humeniuk/jwt-decoder.git"
+    "url": "https://github.com/Beata-Humeniuk/jwt-preview.git"
   },
-  "homepage": "https://github.com/Beata-Humeniuk/jwt-decoder#readme",
+  "homepage": "https://github.com/Beata-Humeniuk/jwt-preview#readme",
   "bugs": {
-    "url": "https://github.com/Beata-Humeniuk/jwt-decoder/issues"
+    "url": "https://github.com/Beata-Humeniuk/jwt-preview/issues"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -42,12 +42,12 @@
   "contributes": {
     "commands": [
       {
-        "command": "jwtDecoder.open",
-        "title": "Open Decoder",
+        "command": "jwtPreview.open",
+        "title": "Open Preview",
         "category": "JWT"
       },
       {
-        "command": "jwtDecoder.decodeSelection",
+        "command": "jwtPreview.decodeSelection",
         "title": "Decode Selected Token",
         "category": "JWT"
       }
@@ -55,7 +55,7 @@
     "menus": {
       "editor/context": [
         {
-          "command": "jwtDecoder.decodeSelection",
+          "command": "jwtPreview.decodeSelection",
           "when": "editorHasSelection",
           "group": "navigation"
         }

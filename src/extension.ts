@@ -14,10 +14,10 @@ let panel: vscode.WebviewPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
-    vscode.commands.registerCommand('jwtDecoder.open', () => {
+    vscode.commands.registerCommand('jwtPreview.open', () => {
       openPanel();
     }),
-    vscode.commands.registerCommand('jwtDecoder.decodeSelection', () => {
+    vscode.commands.registerCommand('jwtPreview.decodeSelection', () => {
       const editor = vscode.window.activeTextEditor;
       const selectedText = editor?.document.getText(editor.selection).trim();
       openPanel(selectedText);
@@ -33,8 +33,8 @@ function openPanel(initialToken?: string) {
     }
   } else {
     panel = vscode.window.createWebviewPanel(
-      'jwtDecoder',
-      'JWT Decoder',
+      'jwtPreview',
+      'JWT Preview',
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
@@ -326,11 +326,11 @@ export function getHtml(initialToken?: string): string {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JWT Decoder</title>
+  <title>JWT Preview</title>
   <style nonce="${nonce}">${styles}  </style>
 </head>
 <body>
-  <h2>JWT Decoder</h2>
+  <h2>JWT Preview</h2>
 
   <textarea id="input" placeholder="Paste a JWT token" aria-label="Paste a JWT token" spellcheck="false">${initialToken ? escapeHtml(initialToken) : ''}</textarea>
   <div class="toolbar">

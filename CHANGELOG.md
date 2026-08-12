@@ -1,6 +1,6 @@
 # Changelog
 
-All notable, user-visible changes to JWT Decoder are documented in this file.
+All notable, user-visible changes to JWT Preview are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/).
 
