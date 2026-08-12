@@ -4,6 +4,17 @@ All notable, user-visible changes to JWT Preview are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-08-13
+
+### Added
+
+- A Simple view alongside the raw JSON view: a human-readable,
+  collapsible list of Header and Payload fields with friendly labels
+  for standard claims, formatted dates, and validity indicators —
+  switchable per token with a toggle.
+- A copy-to-clipboard button for the decoded Header and Payload JSON.
+- A panel tab icon.
+
 ## [1.0.0] - 2026-08-12
 
 ### Added
