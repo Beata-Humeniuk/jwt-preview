@@ -1,95 +1,8 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  base64UrlDecode,
-  escapeHtml,
-  fmtDate,
-  fmtRel,
-  jsonToHtml,
-  parseToken,
-  renderClaims
-} from '../src/webviewLogic';
-
-function b64url(value: string): string {
-  return Buffer.from(value, 'utf-8').toString('base64url');
-}
-
-function makeToken(header: object, payload: object, signature?: string): string {
-  const parts = [b64url(JSON.stringify(header)), b64url(JSON.stringify(payload))];
-  if (signature !== undefined) {
-    parts.push(signature);
-  }
-  return parts.join('.');
-}
+import { escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from '../src/render';
 
 const NOW = 1700000000;
-
-test('valid three-part token decodes header, payload, and signature', () => {
-  const token = makeToken({ alg: 'HS256', typ: 'JWT' }, { sub: 'test-user' }, 'c2lnbmF0dXJl');
-  const parsed = parseToken(token);
-  assert.equal(parsed.kind, 'ok');
-  if (parsed.kind === 'ok') {
-    assert.deepEqual(JSON.parse(parsed.headerStr), { alg: 'HS256', typ: 'JWT' });
-    assert.deepEqual(JSON.parse(parsed.payloadStr), { sub: 'test-user' });
-    assert.equal(parsed.signature, 'c2lnbmF0dXJl');
-  }
-});
-
-test('valid two-part token has empty signature', () => {
-  const parsed = parseToken(makeToken({ alg: 'none' }, { sub: 'x' }));
-  assert.equal(parsed.kind, 'ok');
-  if (parsed.kind === 'ok') {
-    assert.equal(parsed.signature, '');
-  }
-});
-
-test('base64url padding variants decode correctly', () => {
-  for (const value of ['a', 'ab', 'abc', 'abcd', 'abcde']) {
-    assert.equal(base64UrlDecode(b64url(value)), value);
-  }
-});
-
-test('base64url uses URL-safe alphabet', () => {
-  const value = 'ÿþ??>>';
-  const encoded = b64url(value);
-  assert.equal(base64UrlDecode(encoded), value);
-});
-
-test('UTF-8 and non-Latin characters decode correctly', () => {
-  const payload = { name: 'Żółć 日本語 한국어 中文 🙂' };
-  const parsed = parseToken(makeToken({ alg: 'none' }, payload));
-  assert.equal(parsed.kind, 'ok');
-  if (parsed.kind === 'ok') {
-    assert.deepEqual(JSON.parse(parsed.payloadStr), payload);
-  }
-});
-
-test('malformed base64url reports a graceful error', () => {
-  const parsed = parseToken('!!!.@@@');
-  assert.equal(parsed.kind, 'error');
-  if (parsed.kind === 'error') {
-    assert.equal(typeof parsed.message, 'string');
-  }
-});
-
-test('invalid JSON in payload still decodes to a string without throwing', () => {
-  const parsed = parseToken(b64url('{"alg":"none"}') + '.' + b64url('not json at all'));
-  assert.equal(parsed.kind, 'ok');
-  if (parsed.kind === 'ok') {
-    assert.equal(parsed.payloadStr, 'not json at all');
-    assert.throws(() => JSON.parse(parsed.payloadStr));
-  }
-});
-
-test('empty and whitespace-only input is reported as empty', () => {
-  assert.equal(parseToken('').kind, 'empty');
-  assert.equal(parseToken('   \n\t ').kind, 'empty');
-});
-
-test('too few or too many dot-separated parts is invalid', () => {
-  assert.equal(parseToken('justonepart').kind, 'invalid');
-  assert.equal(parseToken('a.b.c.d').kind, 'invalid');
-});
 
 test('large payload renders without hanging', () => {
   const large: Record<string, string> = {};
@@ -159,6 +72,72 @@ test('escapeHtml escapes all special characters', () => {
 
 test('fmtDate formats epoch seconds as UTC', () => {
   assert.equal(fmtDate(0), '1970-01-01 00:00:00 UTC');
+});
+
+test('plain view maps known claims to friendly labels', () => {
+  const html = renderPlain({ iss: 'https://auth.example.com', sub: 'user-42', alg: 'HS256' }, NOW);
+  assert.ok(html.includes('Issuer'));
+  assert.ok(html.includes('Subject'));
+  assert.ok(html.includes('Algorithm'));
+  assert.ok(html.includes('https://auth.example.com'));
+});
+
+test('plain view formats top-level timestamp claims as dates', () => {
+  const html = renderPlain({ exp: NOW + 3600 }, NOW);
+  assert.ok(html.includes('Expires'));
+  assert.ok(html.includes(fmtDate(NOW + 3600)));
+  assert.ok(html.includes('in 1 h'));
+  assert.ok(!html.includes(String(NOW + 3600)));
+});
+
+test('plain view shows validity pills on exp and future nbf', () => {
+  const valid = renderPlain({ exp: NOW + 3600 }, NOW);
+  assert.ok(valid.includes('pill ok'));
+  assert.ok(valid.includes('valid'));
+  const expired = renderPlain({ exp: NOW - 3600 }, NOW);
+  assert.ok(expired.includes('pill err'));
+  assert.ok(expired.includes('expired'));
+  const notYet = renderPlain({ nbf: NOW + 3600 }, NOW);
+  assert.ok(notYet.includes('pill warn'));
+  assert.ok(notYet.includes('not yet active'));
+  const activeNbf = renderPlain({ nbf: NOW - 3600 }, NOW);
+  assert.ok(!activeNbf.includes('pill'));
+});
+
+test('plain view renders booleans as yes/no and null as a dash', () => {
+  const html = renderPlain({ beta: true, legacy: false, note: null }, NOW);
+  assert.ok(html.includes('yes'));
+  assert.ok(html.includes('no'));
+  assert.ok(html.includes('—'));
+});
+
+test('plain view joins arrays of primitives with commas', () => {
+  const html = renderPlain({ aud: ['api', 'web'], roles: ['admin', 'editor'] }, NOW);
+  assert.ok(html.includes('api, web'));
+  assert.ok(html.includes('admin, editor'));
+});
+
+test('plain view renders nested objects as collapsible groups without friendly mapping', () => {
+  const html = renderPlain({ ctx: { sub: 'nested', org: { id: 7 } } }, NOW);
+  assert.ok(html.includes('<details class="pnode" open>'));
+  assert.ok(html.includes('<summary>'));
+  assert.ok(html.includes('ctx'));
+  assert.ok(html.includes('pkids'));
+  assert.ok(html.includes('>sub<'));
+  assert.ok(!html.includes('Subject'));
+  assert.ok(html.includes('7'));
+});
+
+test('plain view escapes HTML in keys and values', () => {
+  const html = renderPlain({ '<img src=x>': '<script>alert(1)</script>' }, NOW);
+  assert.ok(!html.includes('<script>'));
+  assert.ok(!html.includes('<img'));
+  assert.ok(html.includes('&lt;script&gt;'));
+});
+
+test('plain view handles empty objects and primitive roots', () => {
+  assert.ok(renderPlain({}, NOW).includes('(empty)'));
+  assert.ok(renderPlain('raw', NOW).includes('raw'));
 });
 
 test('relative time respects direction, units, and pluralization', () => {
