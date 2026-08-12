@@ -42,12 +42,12 @@
   "contributes": {
     "commands": [
       {
-        "command": "jwtPreview.open",
+        "command": "jwtDecoder.open",
         "title": "Open Preview",
         "category": "JWT"
       },
       {
-        "command": "jwtPreview.decodeSelection",
+        "command": "jwtDecoder.decodeSelection",
         "title": "Decode Selected Token",
         "category": "JWT"
       }
@@ -55,7 +55,7 @@
     "menus": {
       "editor/context": [
         {
-          "command": "jwtPreview.decodeSelection",
+          "command": "jwtDecoder.decodeSelection",
           "when": "editorHasSelection",
           "group": "navigation"
         }

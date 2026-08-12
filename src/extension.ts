@@ -14,10 +14,10 @@ let panel: vscode.WebviewPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
-    vscode.commands.registerCommand('jwtPreview.open', () => {
+    vscode.commands.registerCommand('jwtDecoder.open', () => {
       openPanel();
     }),
-    vscode.commands.registerCommand('jwtPreview.decodeSelection', () => {
+    vscode.commands.registerCommand('jwtDecoder.decodeSelection', () => {
       const editor = vscode.window.activeTextEditor;
       const selectedText = editor?.document.getText(editor.selection).trim();
       openPanel(selectedText);
@@ -33,7 +33,7 @@ function openPanel(initialToken?: string) {
     }
   } else {
     panel = vscode.window.createWebviewPanel(
-      'jwtPreview',
+      'jwtDecoder',
       'JWT Preview',
       vscode.ViewColumn.Beside,
       {
