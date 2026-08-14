@@ -62,6 +62,28 @@
     <div class="section sig">
       <h3>Signature</h3>
       <pre id="signature"></pre>
+      <div class="verify" id="verify">
+        <label class="verify-label" for="key">Verify signature
+          <span id="verify-alg" class="verify-alg"></span>
+        </label>
+        <textarea id="key" spellcheck="false" autocomplete="off"
+          placeholder="HMAC secret, PEM public key or certificate, or JWK / JWK Set"
+          aria-label="Key or secret to verify the signature with"></textarea>
+        <div id="verify-result" class="verify-result hidden" role="status">
+          <span id="verify-icon" class="verify-icon" aria-hidden="true"></span>
+          <span class="verify-body">
+            <strong id="verify-headline"></strong>
+            <span id="verify-msg" class="verify-msg"></span>
+          </span>
+        </div>
+        <div class="verify-bar">
+          <label class="verify-check hidden" id="b64wrap">
+            <input type="checkbox" id="b64secret"> Secret is Base64-encoded
+          </label>
+          <button id="clearkey" class="mini">Clear key</button>
+        </div>
+        <p class="verify-note">The key is used locally and is never stored or sent anywhere.</p>
+      </div>
     </div>
   </div>
 

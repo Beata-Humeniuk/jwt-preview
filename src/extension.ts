@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { claimValidityPill, escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from './render';
 import { base64UrlDecode, parseToken } from './token';
+import { verifySignature } from './verify';
 
 let panel: vscode.WebviewPanel | undefined;
 
@@ -46,10 +47,41 @@ function openPanel(initialToken?: string) {
     );
     panel.iconPath = vscode.Uri.file(path.join(__dirname, '..', 'media', 'icon.png'));
     panel.webview.html = getHtml(initialToken);
+    panel.webview.onDidReceiveMessage((message: unknown) => {
+      handleWebviewMessage(message);
+    });
     panel.onDidDispose(() => {
       panel = undefined;
     });
   }
+}
+
+interface VerifyRequest {
+  requestId: number;
+  token: string;
+  key: string;
+  base64Secret?: boolean;
+}
+
+function asVerifyRequest(message: unknown): VerifyRequest | undefined {
+  if (!message || typeof message !== 'object') {
+    return undefined;
+  }
+  const m = message as Record<string, unknown>;
+  if (m.type !== 'verify' || typeof m.requestId !== 'number' ||
+      typeof m.token !== 'string' || typeof m.key !== 'string') {
+    return undefined;
+  }
+  return { requestId: m.requestId, token: m.token, key: m.key, base64Secret: m.base64Secret === true };
+}
+
+function handleWebviewMessage(message: unknown): void {
+  const request = asVerifyRequest(message);
+  if (!request) {
+    return;
+  }
+  const result = verifySignature(request.token, request.key, { base64Secret: request.base64Secret });
+  panel?.webview.postMessage({ type: 'verifyResult', requestId: request.requestId, result });
 }
 
 const mediaCache = new Map<string, string>();
