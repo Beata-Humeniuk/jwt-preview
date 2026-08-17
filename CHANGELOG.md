@@ -4,6 +4,15 @@ All notable, user-visible changes to JWT Preview are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-08-17
+
+### Changed
+
+- `README.md` no longer restates the security policy. The Privacy section keeps
+  the short claim — no telemetry, no network requests, nothing stored — and
+  points at `SECURITY.md` for the rest. The build instructions, which are of no
+  use to someone installing the extension, are gone from the readme.
+
 ## [1.2.0] - 2026-08-14
 
 ### Added

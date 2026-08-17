@@ -12,18 +12,8 @@ without sending anything anywhere.
 
 No telemetry. No network requests. Tokens and keys are never stored.
 
-Decoding happens on your machine, inside a webview whose Content Security
-Policy blocks network access entirely (`default-src 'none'`,
-`connect-src 'none'`). Signature verification runs in the extension itself,
-using the Node runtime that ships with VS Code, because that is what reads PEM
-and JWK key material; the key travels no further than that. Nothing is fetched
-over the network at any point — in particular, a `jku` or `x5u` URL in a token
-header is never followed.
-
-The extension has no runtime dependencies, reads the clipboard only when you
-press the paste button, and does not retain any data after the panel is
-closed. The key field starts empty every time and its contents are never
-written to disk or to workspace state.
+Decoding and signature verification both run on your machine, so nothing you
+paste in leaves it. See [SECURITY.md](SECURITY.md) for the full scope.
 
 ## Features
 
@@ -54,7 +44,7 @@ Supported algorithms:
 Public keys are accepted as PEM — a `PUBLIC KEY`, an `RSA PUBLIC KEY`, or a
 `CERTIFICATE` to read the key from — as a JWK, or as a JWK Set, in which case
 the key matching the token's `kid` is used. A PEM private key also works; the
-public half is derived from it. The key field is not stored between sessions.
+public half is derived from it.
 
 A result of **signature valid** means the token was signed by the key you
 supplied and has not been altered since. It is not a full validity check: the
@@ -70,10 +60,9 @@ verification inside the system that consumes the token.
 
 ## What it does not do
 
-The extension makes no network requests, so it cannot fetch a key for you: a
-`jku` or `x5u` URL in a token header is ignored, and a JWKS has to be pasted
-in rather than downloaded. It does not enforce claims, does not sign or create
-tokens, and does not remember tokens or keys after the panel is closed.
+It cannot fetch a key for you: a `jku` or `x5u` URL in a token header is
+ignored, and a JWKS has to be pasted in rather than downloaded. It does not
+enforce claims, and it does not sign or create tokens.
 
 ## Usage
 
@@ -98,19 +87,6 @@ Install "JWT Preview" from the Visual Studio Code Marketplace, or download a
 - Bugs and feature requests: [GitHub Issues](https://github.com/Beata-Humeniuk/jwt-preview/issues)
 - Security issues: see [SECURITY.md](SECURITY.md) — please never include real
   tokens in reports.
-
-## Development
-
-```bash
-npm install
-npm run compile   # compile TypeScript to out/
-npm run watch     # compile in watch mode
-npm test          # run the test suite
-npm run package   # build the .vsix
-```
-
-To run the extension for testing, open this folder in VS Code and press `F5`
-(Extension Development Host).
 
 ## License
 
