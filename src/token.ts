@@ -33,3 +33,9 @@ export function parseToken(raw: string): ParsedToken {
     return { kind: 'error', message: e instanceof Error ? e.message : String(e) };
   }
 }
+
+const JWT_SHAPE = /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]*)?$/;
+
+export function looksLikeJwt(text: string): boolean {
+  return JWT_SHAPE.test(text.trim());
+}

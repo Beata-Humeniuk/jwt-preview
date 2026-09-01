@@ -3,20 +3,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { claimValidityPill, escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from './render';
-import { base64UrlDecode, parseToken } from './token';
+import { base64UrlDecode, looksLikeJwt, parseToken } from './token';
 import { verifySignature } from './verify';
 
 let panel: vscode.WebviewPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
-    vscode.commands.registerCommand('jwtDecoder.open', () => {
-      openPanel();
+    vscode.commands.registerCommand('jwtDecoder.open', async () => {
+      openPanel(await tokenFromClipboard());
     }),
-    vscode.commands.registerCommand('jwtDecoder.decodeSelection', () => {
+    vscode.commands.registerCommand('jwtDecoder.decodeSelection', async () => {
       const editor = vscode.window.activeTextEditor;
       const selectedText = editor?.document.getText(editor.selection).trim();
-      openPanel(selectedText);
+      openPanel(selectedText || (await tokenFromClipboard()));
     })
   );
 }
@@ -25,6 +25,15 @@ export function deactivate() {
   if (panel) {
     panel.dispose();
     panel = undefined;
+  }
+}
+
+async function tokenFromClipboard(): Promise<string | undefined> {
+  try {
+    const text = (await vscode.env.clipboard.readText()).trim();
+    return looksLikeJwt(text) ? text : undefined;
+  } catch {
+    return undefined;
   }
 }
 

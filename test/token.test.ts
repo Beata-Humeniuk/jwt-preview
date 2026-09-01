@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { base64UrlDecode, parseToken } from '../src/token';
+import { base64UrlDecode, looksLikeJwt, parseToken } from '../src/token';
 
 function b64url(value: string): string {
   return Buffer.from(value, 'utf-8').toString('base64url');
@@ -79,4 +79,20 @@ test('empty and whitespace-only input is reported as empty', () => {
 test('too few or too many dot-separated parts is invalid', () => {
   assert.equal(parseToken('justonepart').kind, 'invalid');
   assert.equal(parseToken('a.b.c.d').kind, 'invalid');
+});
+
+test('looksLikeJwt accepts two- and three-part base64url tokens, with surrounding whitespace', () => {
+  assert.equal(looksLikeJwt(makeToken({ alg: 'HS256' }, { sub: '1' }, 'sig-_')), true);
+  assert.equal(looksLikeJwt(makeToken({ alg: 'none' }, { sub: '1' })), true);
+  assert.equal(looksLikeJwt(makeToken({ alg: 'none' }, { sub: '1' }, '')), true);
+  assert.equal(looksLikeJwt('  ' + makeToken({ alg: 'HS256' }, { sub: '1' }, 'abc') + '\n'), true);
+});
+
+test('looksLikeJwt rejects text whose first segment is not a base64url JSON object', () => {
+  assert.equal(looksLikeJwt(''), false);
+  assert.equal(looksLikeJwt('hello world'), false);
+  assert.equal(looksLikeJwt('a.b.c.d'), false);
+  assert.equal(looksLikeJwt('www.example.com'), false);
+  assert.equal(looksLikeJwt('Bearer ' + makeToken({ alg: 'HS256' }, { sub: '1' }, 'abc')), false);
+  assert.equal(looksLikeJwt('{"a":1}.{"b":2}'), false);
 });

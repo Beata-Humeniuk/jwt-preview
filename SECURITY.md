@@ -26,7 +26,9 @@ When reporting:
 
 JWT Preview decodes token contents locally and can verify a signature against
 a key you supply. It makes no network requests and stores neither tokens nor
-keys; keys are held in memory only while the panel is open.
+keys; keys are held in memory only while the panel is open. When one of its
+commands is run it reads the clipboard once, uses the text only if it has the
+shape of a JWT, and never writes to the clipboard.
 
 Signature verification uses the `alg` value from the token's own header to
 choose the algorithm, and reports the result to the person reading the panel.

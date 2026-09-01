@@ -4,6 +4,16 @@ All notable, user-visible changes to JWT Preview are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-09-01
+
+### Added
+
+- Both commands pick up a token from the clipboard. **JWT: Open Preview**
+  decodes the clipboard when it holds something shaped like a JWT, and
+  **JWT: Decode Selected Token** does the same when nothing is selected in the
+  editor. Any other clipboard content is ignored and the panel opens empty as
+  before.
+
 ## [1.2.1] - 2026-08-17
 
 ### Changed
