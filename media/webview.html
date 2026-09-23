@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="{{csp}}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JWT Preview</title>
+  <title>Base64 Preview</title>
   <style nonce="{{nonce}}">{{styles}}</style>
 </head>
 <body>
-  <h2>JWT Preview</h2>
+  <h2>Base64 Preview</h2>
 
-  <textarea id="input" placeholder="Paste a JWT token" aria-label="Paste a JWT token" spellcheck="false">{{initialToken}}</textarea>
+  <textarea id="input" placeholder="Paste Base64 text or a data: URI" aria-label="Paste Base64 text or a data: URI" spellcheck="false">{{initialText}}</textarea>
   <div class="toolbar">
     <button id="paste" class="secondary">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3" width="9" height="11" rx="1.2"></rect><path d="M6 3a1.5 1.5 0 0 1 1.5-1.5h1A1.5 1.5 0 0 1 10 3"></path><path d="M6 7.2h4M6 9.6h4M6 12h2.5"></path></svg>
@@ -21,70 +21,72 @@
 
   <div id="error" class="error-box hidden" role="alert"></div>
 
-  <div id="result" class="hidden plain-mode">
-    <div class="viewbar">
-      <span>JSON</span>
+  <div id="result" class="hidden">
+    <div class="summary">
+      <div class="summary-main">
+        <strong id="format"></strong>
+        <span id="mime" class="pill mono"></span>
+        <span id="size" class="pill"></span>
+        <span id="dims" class="pill hidden"></span>
+        <span id="encoding" class="pill hidden"></span>
+        <span id="alphabet" class="pill hidden">URL-safe alphabet</span>
+        <span id="datauri" class="pill hidden">data: URI</span>
+        <span id="declared" class="pill warn hidden"></span>
+      </div>
+      <div class="actions">
+        <button id="save">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8"></path><path d="M5 7l3 3 3-3"></path><path d="M2.5 11.5v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1.5"></path></svg>
+          Save as file…
+        </button>
+        <button id="openeditor" class="secondary hidden">Open in editor</button>
+        <button id="copytext" class="secondary hidden">
+          <svg class="ic-copy" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1"></rect><path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1"></path></svg>
+          <svg class="ic-check" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.5 3.5L13 5"></path></svg>
+          <span>Copy text</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="viewbar" id="viewbar">
+      <span>Preview</span>
       <label class="switch">
-        <input type="checkbox" id="viewmode" role="switch" aria-label="Simple view" checked>
+        <input type="checkbox" id="viewmode" role="switch" aria-label="Show hex dump">
         <span class="track"></span>
       </label>
-      <span>Simple</span>
+      <span>Hex</span>
     </div>
-    <div class="section header">
-      <h3>Header
-        <button class="mini" data-target="header" data-open="true">Expand all</button>
-        <button class="mini" data-target="header" data-open="false">Collapse all</button>
-      </h3>
-      <div class="jsonwrap view-json">
-        <button class="copybtn" data-copy="header" title="Copy JSON" aria-label="Copy header JSON">
+
+    <div class="section preview view-preview">
+      <h3>Preview</h3>
+      <div id="image-wrap" class="image-wrap hidden">
+        <img id="image" alt="Decoded image">
+      </div>
+      <div id="image-error" class="note hidden">The image data could not be rendered. Save it as a file and try another viewer.</div>
+      <div id="json-wrap" class="jsonwrap hidden">
+        <div class="mini-bar">
+          <button class="mini" data-open="true">Expand all</button>
+          <button class="mini" data-open="false">Collapse all</button>
+        </div>
+        <button class="copybtn" id="copyjson" title="Copy formatted JSON" aria-label="Copy formatted JSON">
           <svg class="ic-copy" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1"></rect><path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1"></path></svg>
           <svg class="ic-check" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.5 3.5L13 5"></path></svg>
         </button>
-        <div class="jsonbox" id="header"></div>
+        <div class="jsonbox" id="json"></div>
       </div>
-      <div class="jsonbox view-plain" id="header-plain"></div>
-    </div>
-    <div class="section payload">
-      <h3>Payload
-        <button class="mini" data-target="payload" data-open="true">Expand all</button>
-        <button class="mini" data-target="payload" data-open="false">Collapse all</button>
-      </h3>
-      <div class="jsonwrap view-json">
-        <button class="copybtn" data-copy="payload" title="Copy JSON" aria-label="Copy payload JSON">
-          <svg class="ic-copy" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1"></rect><path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1"></path></svg>
-          <svg class="ic-check" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.5 3.5L13 5"></path></svg>
-        </button>
-        <div class="jsonbox" id="payload"></div>
+      <div id="text-wrap" class="hidden">
+        <pre id="text"></pre>
+        <div id="text-note" class="note hidden"></div>
       </div>
-      <div class="jsonbox view-plain" id="payload-plain"></div>
-      <div class="claims" id="claims"></div>
+      <div id="binary-note" class="note hidden"></div>
     </div>
-    <div class="section sig">
-      <h3>Signature</h3>
-      <pre id="signature"></pre>
-      <div class="verify" id="verify">
-        <label class="verify-label" for="key">Verify signature
-          <span id="verify-alg" class="verify-alg"></span>
-        </label>
-        <textarea id="key" spellcheck="false" autocomplete="off"
-          placeholder="HMAC secret, PEM public key or certificate, or JWK / JWK Set"
-          aria-label="Key or secret to verify the signature with"></textarea>
-        <div id="verify-result" class="verify-result hidden" role="status">
-          <span id="verify-icon" class="verify-icon" aria-hidden="true"></span>
-          <span class="verify-body">
-            <strong id="verify-headline"></strong>
-            <span id="verify-msg" class="verify-msg"></span>
-          </span>
-        </div>
-        <div class="verify-bar">
-          <label class="verify-check hidden" id="b64wrap">
-            <input type="checkbox" id="b64secret"> Secret is Base64-encoded
-          </label>
-          <button id="clearkey" class="mini">Clear key</button>
-        </div>
-        <p class="verify-note">The key is used locally and is never stored or sent anywhere.</p>
-      </div>
+
+    <div class="section hex view-hex">
+      <h3>Hex dump</h3>
+      <pre id="hex"></pre>
+      <div id="hex-note" class="note hidden"></div>
     </div>
+
+    <p class="footnote">Everything is decoded locally. Files are written only where you choose in the save dialog.</p>
   </div>
 
   <script nonce="{{nonce}}">{{script}}</script>

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the latest published version of JWT Preview receives security fixes.
+Only the latest published version of Base64 Preview receives security fixes.
 
 ## Reporting a vulnerability
 
@@ -14,26 +14,31 @@ sensitive details.
 
 When reporting:
 
-- Do **not** include real JWT tokens, production data, signing keys, or any
-  sensitive payloads in issues or reports.
-- Reproduce the problem using synthetic tokens only. Use a synthetic token
-  built from made-up JSON values and Base64URL-encoded segments, signed with a
-  throwaway key generated for the report.
-- You will never be asked to send a real token or a real key by email or any
-  other channel.
+- Do **not** include real documents, credentials, keys, personal data or any
+  other sensitive content — encoded or not — in issues or reports.
+- Reproduce the problem using synthetic data only: a made-up text, a tiny
+  generated image, or a hand-built byte sequence, encoded with any Base64 tool.
+- You will never be asked to send real data by email or any other channel.
 
 ## Scope notes
 
-JWT Preview decodes token contents locally and can verify a signature against
-a key you supply. It makes no network requests and stores neither tokens nor
-keys; keys are held in memory only while the panel is open. When one of its
-commands is run it reads the clipboard once, uses the text only if it has the
-shape of a JWT, and never writes to the clipboard.
+Base64 Preview decodes Base64 locally and shows the result inside a VS Code
+webview. It makes no network requests and stores nothing; decoded content is
+held in memory only while the panel is open. When one of its commands is run
+it reads the clipboard once, uses the text only if it has the shape of Base64
+or a `data:` URI, and writes to the clipboard only when a copy button is
+pressed.
 
-Signature verification uses the `alg` value from the token's own header to
-choose the algorithm, and reports the result to the person reading the panel.
-This is deliberate — the panel is a reading aid for a human, not an
-authentication gate — so reports that the header's `alg` is trusted are out of
-scope. Reports that a signature is shown as valid when it is not, that an
-unsigned token (including `alg: none`) is reported as valid, or that key
-material is written to disk or leaves the machine, are in scope and welcome.
+The webview has no access to local files or to the network. Images are
+rendered from `data:` URIs built in memory, and SVG is shown through an `<img>`
+element, so scripts inside an SVG do not run. Text is inserted as text, never
+as markup. Files are written only through the save dialog, to the location you
+choose there.
+
+File-type detection is a reading aid: it names what the bytes look like so you
+can pick a suitable application, and it does not make the content safe. A
+decoded file should be treated with the same care as any file downloaded from
+the source the Base64 came from. Reports that the panel renders content as
+markup, runs script from decoded data, reaches the network, or writes a file
+anywhere other than the chosen location are in scope and welcome; reports that
+a decoded file is itself malicious are not.

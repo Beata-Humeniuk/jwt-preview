@@ -1,151 +1,216 @@
 const input = document.getElementById('input');
 const errorBox = document.getElementById('error');
 const result = document.getElementById('result');
-const headerEl = document.getElementById('header');
-const payloadEl = document.getElementById('payload');
-const headerPlainEl = document.getElementById('header-plain');
-const payloadPlainEl = document.getElementById('payload-plain');
-const signatureEl = document.getElementById('signature');
-const claimsEl = document.getElementById('claims');
+const formatEl = document.getElementById('format');
+const mimeEl = document.getElementById('mime');
+const sizeEl = document.getElementById('size');
+const dimsEl = document.getElementById('dims');
+const encodingEl = document.getElementById('encoding');
+const alphabetEl = document.getElementById('alphabet');
+const dataUriEl = document.getElementById('datauri');
+const declaredEl = document.getElementById('declared');
+const viewBar = document.getElementById('viewbar');
 const viewMode = document.getElementById('viewmode');
-const keyEl = document.getElementById('key');
-const b64El = document.getElementById('b64secret');
-const b64Wrap = document.getElementById('b64wrap');
-const verifyAlgEl = document.getElementById('verify-alg');
-const verifyResultEl = document.getElementById('verify-result');
-const verifyIconEl = document.getElementById('verify-icon');
-const verifyHeadlineEl = document.getElementById('verify-headline');
-const verifyMsgEl = document.getElementById('verify-msg');
+const imageWrap = document.getElementById('image-wrap');
+const imageEl = document.getElementById('image');
+const imageError = document.getElementById('image-error');
+const jsonWrap = document.getElementById('json-wrap');
+const jsonEl = document.getElementById('json');
+const textWrap = document.getElementById('text-wrap');
+const textEl = document.getElementById('text');
+const textNote = document.getElementById('text-note');
+const binaryNote = document.getElementById('binary-note');
+const hexEl = document.getElementById('hex');
+const hexNote = document.getElementById('hex-note');
+const saveBtn = document.getElementById('save');
+const openEditorBtn = document.getElementById('openeditor');
+const copyTextBtn = document.getElementById('copytext');
+const copyJsonBtn = document.getElementById('copyjson');
 const vscode = acquireVsCodeApi();
-let currentStrs = { header: '', payload: '' };
-let verifySeq = 0;
 
-const VERIFY_LABELS = {
-  pending: { text: 'Checking…', cls: 'pending', icon: '' },
-  valid: { text: 'Signature valid', cls: 'ok', icon: '✓' },
-  invalid: { text: 'Signature invalid', cls: 'bad', icon: '✕' },
-  unsigned: { text: 'Nothing to verify', cls: 'warn', icon: '!' },
-  unsupported: { text: 'Unsupported algorithm', cls: 'warn', icon: '!' },
-  error: { text: 'Cannot check', cls: 'warn', icon: '!' }
-};
+const TEXT_PREVIEW_LIMIT = 200000;
+const HEX_DUMP_LIMIT = 4096;
 
-function setVerifyStatus(result) {
-  if (!result) {
-    verifyResultEl.className = 'verify-result hidden';
-    return;
-  }
-  const label = VERIFY_LABELS[result.status] || VERIFY_LABELS.error;
-  verifyResultEl.className = 'verify-result ' + label.cls;
-  verifyIconEl.textContent = label.icon;
-  verifyHeadlineEl.textContent = label.text;
-  verifyMsgEl.textContent = result.message || '';
-}
-
-function requestVerify() {
-  const token = input.value.trim();
-  const key = keyEl.value.trim();
-  const requestId = ++verifySeq;
-  if (!token || !key) {
-    setVerifyStatus(null);
-    return;
-  }
-  setVerifyStatus({ status: 'pending' });
-  vscode.postMessage({ type: 'verify', requestId, token, key, base64Secret: b64El.checked });
-}
-
-function renderJsonInto(el, jsonStr) {
-  try {
-    el.innerHTML = jsonToHtml(JSON.parse(jsonStr), '');
-  } catch (e) {
-    el.textContent = jsonStr;
-  }
-}
-
-function renderPlainInto(el, jsonStr, now) {
-  try {
-    el.innerHTML = renderPlain(JSON.parse(jsonStr), now);
-  } catch (e) {
-    el.textContent = jsonStr;
-  }
-}
+let current = null;
 
 function showError(msg) {
   errorBox.textContent = msg;
   errorBox.classList.remove('hidden');
   result.classList.add('hidden');
+  current = null;
+}
+
+function hideAll() {
+  errorBox.classList.add('hidden');
+  result.classList.add('hidden');
+  imageEl.removeAttribute('src');
+  current = null;
+}
+
+function setPill(el, text) {
+  el.textContent = text || '';
+  el.classList.toggle('hidden', !text);
+}
+
+function setHexMode(on) {
+  result.classList.toggle('hex-mode', on);
+  viewMode.checked = on;
+}
+
+function renderSummary(normalized, bytes, info) {
+  formatEl.textContent = info.format;
+  mimeEl.textContent = info.mime;
+  sizeEl.textContent = formatSize(bytes.length) + (bytes.length >= 1024 ? ' (' + bytes.length.toLocaleString('en-US') + ' bytes)' : '');
+  setPill(dimsEl, '');
+  setPill(encodingEl, info.encoding && info.encoding !== 'utf-8' ? info.encoding.toUpperCase() : '');
+  alphabetEl.classList.toggle('hidden', !normalized.urlSafe);
+  dataUriEl.classList.toggle('hidden', !normalized.fromDataUri);
+  const mismatch = info.declaredMime && info.declaredMime !== info.mime && info.declaredMime !== 'application/octet-stream';
+  setPill(declaredEl, mismatch ? 'declared as ' + info.declaredMime : '');
+}
+
+function renderPreview(info, base64) {
+  imageWrap.classList.add('hidden');
+  imageError.classList.add('hidden');
+  jsonWrap.classList.add('hidden');
+  textWrap.classList.add('hidden');
+  binaryNote.classList.add('hidden');
+  textNote.classList.add('hidden');
+  imageEl.removeAttribute('src');
+
+  if (info.kind === 'image') {
+    imageWrap.classList.remove('hidden');
+    imageEl.src = 'data:' + info.mime + ';base64,' + base64;
+  }
+  if (info.isJson) {
+    jsonWrap.classList.remove('hidden');
+    try {
+      jsonEl.innerHTML = jsonToHtml(JSON.parse(info.text), '');
+    } catch (e) {
+      jsonEl.textContent = info.text;
+    }
+  } else if (typeof info.text === 'string') {
+    textWrap.classList.remove('hidden');
+    if (info.text.length > TEXT_PREVIEW_LIMIT) {
+      textEl.textContent = info.text.slice(0, TEXT_PREVIEW_LIMIT);
+      textNote.textContent = 'Showing the first ' + TEXT_PREVIEW_LIMIT.toLocaleString('en-US') +
+        ' of ' + info.text.length.toLocaleString('en-US') + ' characters. Open it in the editor to see everything.';
+      textNote.classList.remove('hidden');
+    } else {
+      textEl.textContent = info.text;
+    }
+  }
+
+  const previewable = info.kind === 'image' || typeof info.text === 'string';
+  viewBar.classList.toggle('hidden', !previewable);
+  if (!previewable) {
+    binaryNote.textContent = info.format === 'Binary data'
+      ? 'No known file signature was found, so there is no inline preview. The hex dump below shows the raw bytes; you can still save them as a file.'
+      : 'There is no inline preview for a ' + info.format + '. Save it as a file to open it in a suitable application.';
+    binaryNote.classList.remove('hidden');
+  }
+  setHexMode(!previewable);
+
+  openEditorBtn.classList.toggle('hidden', typeof info.text !== 'string');
+  copyTextBtn.classList.toggle('hidden', typeof info.text !== 'string');
+}
+
+function renderHex(bytes) {
+  hexEl.textContent = hexDump(bytes, HEX_DUMP_LIMIT);
+  if (bytes.length > HEX_DUMP_LIMIT) {
+    hexNote.textContent = 'Showing the first ' + formatSize(HEX_DUMP_LIMIT) + ' of ' + formatSize(bytes.length) + '.';
+    hexNote.classList.remove('hidden');
+  } else {
+    hexNote.classList.add('hidden');
+  }
 }
 
 function decode() {
-  const parsed = parseToken(input.value);
-  verifyAlgEl.textContent = '';
-  b64Wrap.classList.add('hidden');
-  setVerifyStatus(null);
-  verifySeq++;
-  if (parsed.kind === 'empty') {
-    errorBox.classList.add('hidden');
-    result.classList.add('hidden');
+  const normalized = normalizeBase64(input.value);
+  if (normalized.kind === 'empty') {
+    hideAll();
     return;
   }
-  if (parsed.kind === 'invalid') {
-    showError("This doesn't look like a JWT — expected 2–3 parts separated by a dot.");
+  if (normalized.kind === 'invalid') {
+    showError(normalized.message);
     return;
   }
-  if (parsed.kind === 'error') {
-    showError('Failed to decode the token: ' + parsed.message);
-    return;
-  }
-  currentStrs = { header: parsed.headerStr, payload: parsed.payloadStr };
-  const now = Math.floor(Date.now() / 1000);
-  renderJsonInto(headerEl, parsed.headerStr);
-  renderJsonInto(payloadEl, parsed.payloadStr);
-  renderPlainInto(headerPlainEl, parsed.headerStr, now);
-  renderPlainInto(payloadPlainEl, parsed.payloadStr, now);
-  signatureEl.textContent = parsed.signature || '(no signature)';
-
-  let claimsHtml = '';
-  try { claimsHtml = renderClaims(JSON.parse(parsed.payloadStr), now); } catch (e) {}
-  claimsEl.innerHTML = claimsHtml;
-
-  let alg = '';
+  let bytes;
   try {
-    const header = JSON.parse(parsed.headerStr);
-    if (typeof header.alg === 'string') { alg = header.alg; }
-  } catch (e) {}
-  verifyAlgEl.textContent = alg;
-  b64Wrap.classList.toggle('hidden', alg.slice(0, 2) !== 'HS');
-  requestVerify();
+    bytes = decodeBase64(normalized.base64);
+  } catch (e) {
+    showError('Failed to decode the text: ' + (e && e.message ? e.message : String(e)));
+    return;
+  }
+  const info = detectContent(bytes, normalized.mimeHint);
+  current = { base64: normalized.base64, bytes, info };
+
+  renderSummary(normalized, bytes, info);
+  renderPreview(info, normalized.base64);
+  renderHex(bytes);
 
   errorBox.classList.add('hidden');
   result.classList.remove('hidden');
 }
 
-const sectionBoxes = {
-  header: [headerEl, headerPlainEl],
-  payload: [payloadEl, payloadPlainEl]
-};
-document.querySelectorAll('button.mini[data-target]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    sectionBoxes[btn.dataset.target].forEach(box => {
-      box.querySelectorAll('details').forEach(d => { d.open = btn.dataset.open === 'true'; });
-    });
+imageEl.addEventListener('load', () => {
+  if (imageEl.naturalWidth && imageEl.naturalHeight) {
+    setPill(dimsEl, imageEl.naturalWidth + ' × ' + imageEl.naturalHeight + ' px');
+  }
+});
+imageEl.addEventListener('error', () => {
+  if (imageEl.getAttribute('src')) {
+    imageError.classList.remove('hidden');
+  }
+});
+
+function flashCopied(btn) {
+  btn.classList.add('copied');
+  setTimeout(() => btn.classList.remove('copied'), 1500);
+}
+
+saveBtn.addEventListener('click', () => {
+  if (!current) { return; }
+  vscode.postMessage({
+    type: 'save',
+    base64: current.base64,
+    fileName: 'decoded.' + current.info.extension,
+    format: current.info.format,
+    extension: current.info.extension
   });
 });
 
-document.querySelectorAll('button.copybtn').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const raw = currentStrs[btn.dataset.copy];
-    let text = raw;
-    try { text = JSON.stringify(JSON.parse(raw), null, 2); } catch (e) {}
-    try {
-      await navigator.clipboard.writeText(text);
-      btn.classList.add('copied');
-      setTimeout(() => btn.classList.remove('copied'), 1500);
-    } catch (e) {}
+openEditorBtn.addEventListener('click', () => {
+  if (!current || typeof current.info.text !== 'string') { return; }
+  vscode.postMessage({ type: 'openInEditor', text: current.info.text, language: current.info.language || 'plaintext' });
+});
+
+copyTextBtn.addEventListener('click', async () => {
+  if (!current || typeof current.info.text !== 'string') { return; }
+  try {
+    await navigator.clipboard.writeText(current.info.text);
+    flashCopied(copyTextBtn);
+  } catch (e) {}
+});
+
+copyJsonBtn.addEventListener('click', async () => {
+  if (!current || typeof current.info.text !== 'string') { return; }
+  let text = current.info.text;
+  try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+  try {
+    await navigator.clipboard.writeText(text);
+    flashCopied(copyJsonBtn);
+  } catch (e) {}
+});
+
+document.querySelectorAll('button.mini[data-open]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    jsonEl.querySelectorAll('details').forEach(d => { d.open = btn.dataset.open === 'true'; });
   });
 });
 
 viewMode.addEventListener('change', () => {
-  result.classList.toggle('plain-mode', viewMode.checked);
+  result.classList.toggle('hex-mode', viewMode.checked);
 });
 
 input.addEventListener('input', decode);
@@ -160,26 +225,15 @@ document.getElementById('paste').addEventListener('click', async () => {
     input.value = text.trim();
     decode();
   } catch (e) {
-    showError('No clipboard access — paste the token manually (Ctrl/Cmd+V).');
+    showError('No clipboard access — paste the text manually (Ctrl/Cmd+V).');
   }
-});
-
-keyEl.addEventListener('input', requestVerify);
-b64El.addEventListener('change', requestVerify);
-document.getElementById('clearkey').addEventListener('click', () => {
-  keyEl.value = '';
-  requestVerify();
-  keyEl.focus();
 });
 
 window.addEventListener('message', (event) => {
   const msg = event.data;
-  if (msg && msg.type === 'setToken') {
-    input.value = msg.token;
+  if (msg && msg.type === 'setInput' && typeof msg.text === 'string') {
+    input.value = msg.text;
     decode();
-  }
-  if (msg && msg.type === 'verifyResult' && msg.requestId === verifySeq) {
-    setVerifyStatus(msg.result);
   }
 });
 

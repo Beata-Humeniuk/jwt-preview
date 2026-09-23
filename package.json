@@ -1,8 +1,8 @@
 {
-  "name": "jwt-preview",
-  "displayName": "JWT Preview",
-  "description": "A clear, readable view of JWT token contents.",
-  "version": "1.3.0",
+  "name": "base64-preview",
+  "displayName": "Base64 Preview",
+  "description": "A clear, readable view of Base64 content: text, JSON, images and files.",
+  "version": "1.0.0",
   "publisher": "beatahumeniuk",
   "license": "MIT",
   "author": {
@@ -10,11 +10,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Beata-Humeniuk/jwt-preview.git"
+    "url": "https://github.com/Beata-Humeniuk/base64-preview.git"
   },
-  "homepage": "https://github.com/Beata-Humeniuk/jwt-preview#readme",
+  "homepage": "https://github.com/Beata-Humeniuk/base64-preview#readme",
   "bugs": {
-    "url": "https://github.com/Beata-Humeniuk/jwt-preview/issues"
+    "url": "https://github.com/Beata-Humeniuk/base64-preview/issues"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -29,12 +29,13 @@
     "Other"
   ],
   "keywords": [
-    "jwt",
-    "token",
+    "base64",
     "decode",
-    "verify",
-    "signature",
-    "json web token",
+    "preview",
+    "data uri",
+    "image",
+    "file",
+    "hex",
     "offline",
     "local",
     "privacy"
@@ -44,20 +45,20 @@
   "contributes": {
     "commands": [
       {
-        "command": "jwtDecoder.open",
+        "command": "base64Preview.open",
         "title": "Open Preview",
-        "category": "JWT"
+        "category": "Base64"
       },
       {
-        "command": "jwtDecoder.decodeSelection",
-        "title": "Decode Selected Token",
-        "category": "JWT"
+        "command": "base64Preview.decodeSelection",
+        "title": "Decode Selection",
+        "category": "Base64"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "jwtDecoder.decodeSelection",
+          "command": "base64Preview.decodeSelection",
           "when": "editorHasSelection",
           "group": "navigation"
         }

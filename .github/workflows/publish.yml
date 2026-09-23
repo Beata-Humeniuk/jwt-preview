@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
           tag="v${version}"
-          vsix="jwt-preview-${version}.vsix"
+          vsix="base64-preview-${version}.vsix"
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -77,13 +77,13 @@ jobs:
           node <<'NODE'
           const manifest = require('/tmp/extension-package.json');
           const expected = {
-            name: 'jwt-preview',
-            displayName: 'JWT Preview',
+            name: 'base64-preview',
+            displayName: 'Base64 Preview',
             publisher: 'beatahumeniuk',
             version: process.env.EXPECTED_VERSION,
             repository: {
               type: 'git',
-              url: 'https://github.com/Beata-Humeniuk/jwt-preview.git',
+              url: 'https://github.com/Beata-Humeniuk/base64-preview.git',
             },
           };
           for (const [key, value] of Object.entries(expected)) {

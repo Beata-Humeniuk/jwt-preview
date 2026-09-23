@@ -1,96 +1,89 @@
-# JWT Preview
+# Base64 Preview
 
-A Visual Studio Code extension for viewing JWT token contents in a clear,
-readable format. Copy a token, paste one, or select one in the editor to
-inspect its Header and Payload as readable JSON, with standard claims
-formatted for quick reading. If you have the signing key, the panel can also
-check the signature — without sending anything anywhere.
+A Visual Studio Code extension for seeing what a piece of Base64 actually is.
+Copy some Base64, paste it, or select it in the editor, and the panel decodes
+it, works out what it contains — text, JSON, an image, a PDF, an archive, a
+font — and shows it in the most useful way it can. Whatever it is, you can save
+it as a real file with the right extension, without anything leaving your
+machine.
 
-![The JWT Preview panel showing a decoded synthetic token](media/screenshot.png)
+![The Base64 Preview panel showing a decoded PNG image](media/screenshot.png)
 
 ## Privacy
 
-No telemetry. No network requests. Tokens and keys are never stored. The
-clipboard is read only when you run a command, and never written to.
+No telemetry. No network requests. Nothing you paste is stored. The clipboard
+is read only when you run a command, and never written to unless you press a
+copy button. Files are written only where you choose in the save dialog.
 
-Decoding and signature verification both run on your machine, so nothing you
-paste in leaves it. See [SECURITY.md](SECURITY.md) for the full scope.
+Decoding and file-type detection run entirely on your machine. See
+[SECURITY.md](SECURITY.md) for the full scope.
 
 ## Features
 
 - Live decoding as you type or paste.
-- Picks up a token straight from the clipboard or the editor selection.
-- Header and Payload rendered as a collapsible JSON tree; the Signature
-  segment is displayed as-is.
-- Standard claims formatted where present: `exp`, `iat`, `nbf`, `iss`, `sub`,
-  `aud` — with UTC timestamps, relative times, and expiration status.
-- Correct Base64URL and UTF-8 handling, including non-Latin characters.
-- Optional signature verification against a key you supply (see below).
+- Picks up Base64 straight from the clipboard or the editor selection.
+- Accepts bare Base64, `data:` URIs, the URL-safe alphabet, line-wrapped
+  text, quoted strings and missing padding — and explains what is wrong when
+  the text is not Base64 at all.
+- Recognises what the bytes are from their signature: PNG, JPEG, GIF, WebP,
+  SVG, BMP, ICO, AVIF, PDF, ZIP, DOCX, XLSX, PPTX, JAR, GZIP, 7z, RAR, TAR, MP3,
+  WAV, OGG, FLAC, MP4, WebM, WOFF, TTF, OTF, SQLite, WebAssembly and more —
+  and tells UTF-8 text, JSON, XML, HTML, PEM and JWTs apart from binary data.
+- Shows the content in the most useful form: images inline, JSON as a
+  collapsible tree, text as text, and everything else as a hex dump.
+- **Save as file…** writes the decoded bytes to disk with a suggested name and
+  extension that match the detected type, so a decoded `docx` opens in Word
+  and a decoded `png` opens in an image viewer.
+- **Open in editor** puts decoded text into a new editor tab with the right
+  language mode; **Copy text** puts it on the clipboard.
+- Flags a `data:` URI whose declared media type does not match the bytes.
 - Follows the editor theme (light, dark, high contrast).
 
-## Verifying a signature
+## How detection works
 
-Verification is optional. Leave the key field empty and the extension only
-decodes and displays. Paste a key into it and the panel reports whether the
-signature matches.
+The decoded bytes are matched against the leading bytes ("magic numbers") of
+well-known formats first. If none match, the bytes are decoded as UTF-8 (or as
+UTF-16 when a byte order mark is present); text that decodes cleanly is then
+classified by its content — JSON, SVG, HTML, XML, PEM, RTF, or a JWT — and
+otherwise treated as plain text. A `data:` URI's media type is used to refine
+a generic result (for example `text/csv`) but never to override what the bytes
+themselves say. Bytes that are neither text nor a known format are shown as
+"Binary data" with a hex dump, and can still be saved with a `.bin` extension.
 
-Supported algorithms:
-
-| Family | Algorithms | Key to supply |
-| --- | --- | --- |
-| HMAC | `HS256`, `HS384`, `HS512` | the shared secret, as text or Base64 |
-| RSA | `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512` | an RSA public key |
-| ECDSA | `ES256`, `ES384`, `ES512` | an EC public key on P-256, P-384 or P-521 |
-| EdDSA | `EdDSA` | an Ed25519 or Ed448 public key |
-
-Public keys are accepted as PEM — a `PUBLIC KEY`, an `RSA PUBLIC KEY`, or a
-`CERTIFICATE` to read the key from — as a JWK, or as a JWK Set, in which case
-the key matching the token's `kid` is used. A PEM private key also works; the
-public half is derived from it.
-
-A result of **signature valid** means the token was signed by the key you
-supplied and has not been altered since. It is not a full validity check: the
-`exp` and `nbf` claims are displayed with their status, but they are not
-enforced, and neither the issuer nor the audience is checked against anything.
-Tokens with no signature — including `alg: none` — are reported as unsigned
-rather than as valid.
-
-The algorithm is taken from the token's own header, as in any token viewer, so
-a result here tells you whether the token matches a key you already trust. It
-is a reading aid rather than an authentication decision, and no substitute for
-verification inside the system that consumes the token.
-
-## What it does not do
-
-It cannot fetch a key for you: a `jku` or `x5u` URL in a token header is
-ignored, and a JWKS has to be pasted in rather than downloaded. It does not
-enforce claims, and it does not sign or create tokens.
+Formats that have no inline preview in VS Code — PDFs, archives, Office
+documents, audio, video — are identified and can be saved; open the saved file
+in a suitable application.
 
 ## Usage
 
-Copy a token, open the Command Palette (`Ctrl/Cmd+Shift+P`), and run
-**JWT: Open Preview**. If the clipboard holds something shaped like a JWT, it
-is decoded straight away; otherwise paste a token into the input field.
+Copy some Base64, open the Command Palette (`Ctrl/Cmd+Shift+P`), and run
+**Base64: Open Preview**. If the clipboard holds something shaped like Base64
+or a `data:` URI, it is decoded straight away; otherwise paste it into the
+input field.
 
-To decode a token that is already in your editor: select it, right-click, and
-choose **JWT: Decode Selected Token**. With nothing selected, this command
-falls back to the clipboard as well.
+To decode Base64 that is already in your editor: select it, right-click, and
+choose **Base64: Decode Selection**. With nothing selected, this command falls
+back to the clipboard as well.
 
-To check a signature, paste the key or secret into the **Verify signature**
-field below the token; the result appears directly underneath it. Leaving that
-field empty skips verification entirely.
+Use the **Preview / Hex** toggle to switch between the rendered view and the
+raw bytes. Press **Save as file…** to write the decoded content to disk; the
+save dialog suggests a file name with the detected extension.
+
+If the decoded text turns out to be a JSON Web Token, the companion
+[JWT Preview](https://marketplace.visualstudio.com/items?itemName=beatahumeniuk.jwt-preview)
+extension shows its claims in detail.
 
 ## Installation
 
-Install "JWT Preview" from the Visual Studio Code Marketplace, or download a
-`.vsix` from the repository's Releases page and install it via
+Install "Base64 Preview" from the Visual Studio Code Marketplace, or download
+a `.vsix` from the repository's Releases page and install it via
 `Extensions: Install from VSIX...`.
 
 ## Feedback and security
 
-- Bugs and feature requests: [GitHub Issues](https://github.com/Beata-Humeniuk/jwt-preview/issues)
+- Bugs and feature requests: [GitHub Issues](https://github.com/Beata-Humeniuk/base64-preview/issues)
 - Security issues: see [SECURITY.md](SECURITY.md) — please never include real
-  tokens in reports.
+  data in reports.
 
 ## License
 

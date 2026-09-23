@@ -1,70 +1,31 @@
 # Changelog
 
-All notable, user-visible changes to JWT Preview are documented in this file.
+All notable, user-visible changes to Base64 Preview are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/).
 
-## [1.3.0] - 2026-09-01
+## [1.0.0] - 2026-09-23
 
 ### Added
 
-- Both commands pick up a token from the clipboard. **JWT: Open Preview**
-  decodes the clipboard when it holds something shaped like a JWT, and
-  **JWT: Decode Selected Token** does the same when nothing is selected in the
-  editor. Any other clipboard content is ignored and the panel opens empty as
-  before.
-
-## [1.2.1] - 2026-08-17
-
-### Changed
-
-- `README.md` no longer restates the security policy. The Privacy section keeps
-  the short claim — no telemetry, no network requests, nothing stored — and
-  points at `SECURITY.md` for the rest. The build instructions, which are of no
-  use to someone installing the extension, are gone from the readme.
-
-## [1.2.0] - 2026-08-14
-
-### Added
-
-- Optional signature verification. Paste a key next to a token and the panel
-  reports whether the signature matches, with the result shown directly beneath
-  the key field. Supports HS256/384/512, RS256/384/512, PS256/384/512,
-  ES256/384/512 and EdDSA, with the key given as an HMAC secret (plain or
-  Base64), a PEM public key, certificate or private key, or a JWK or JWK Set —
-  from which the entry matching the token's `kid` is chosen.
-- Verification is local and stays offline: keys are never stored, and no
-  network request is made, so a `jku` or `x5u` URL in a token header is never
-  followed.
-- The token's `alg` is shown beside the verification field, and tokens that
-  carry no signature — including `alg: none` — are reported as unsigned rather
-  than as valid.
-
-### Changed
-
-- The documentation no longer presents the absence of signature verification as
-  a design decision. `README.md` and `SECURITY.md` now describe what a
-  verification result does and does not tell you.
-
-## [1.1.0] - 2026-08-13
-
-### Added
-
-- A Simple view alongside the raw JSON view: a human-readable,
-  collapsible list of Header and Payload fields with friendly labels
-  for standard claims, formatted dates, and validity indicators —
-  switchable per token with a toggle.
-- A copy-to-clipboard button for the decoded Header and Payload JSON.
-- A panel tab icon.
-
-## [1.0.0] - 2026-08-12
-
-### Added
-
-- Local decoding of JWT Header and Payload, with the Signature segment
-  displayed as-is.
-- Readable formatting of standard claims: `exp`, `iat`, `nbf`, `iss`, `sub`,
-  `aud`, including expiration status and relative times.
-- Decoding a selected token from the editor context menu.
-- Strict webview isolation: no network access, no local resource access, no
-  token storage.
+- Local decoding of Base64 text, `data:` URIs, the URL-safe alphabet,
+  line-wrapped and quoted input, and input with missing padding, with a plain
+  explanation when the text is not Base64.
+- Detection of what the decoded bytes are: images (PNG, JPEG, GIF, WebP, SVG,
+  BMP, ICO, AVIF), documents (PDF, DOCX, XLSX, PPTX, legacy Office), archives
+  (ZIP, JAR, GZIP, BZIP2, XZ, 7z, RAR, TAR), audio and video (MP3, WAV, OGG,
+  FLAC, MP4, M4A, WebM, AVI), fonts (WOFF, WOFF2, TTF, OTF), executables and
+  databases, plus UTF-8 / UTF-16 text classified as JSON, XML, SVG, HTML, PEM,
+  RTF or a JWT.
+- Inline preview: images rendered in the panel, JSON as a collapsible tree with
+  a copy button, text as text, and a hex dump for everything, switchable with a
+  Preview / Hex toggle.
+- **Save as file…** writes the decoded bytes to a location you pick, with a
+  suggested name and extension matching the detected type.
+- **Open in editor** and **Copy text** for decoded text.
+- Both commands pick up Base64 from the clipboard. **Base64: Open Preview**
+  decodes the clipboard when it holds something shaped like Base64 or a `data:`
+  URI, and **Base64: Decode Selection** does the same when nothing is selected
+  in the editor.
+- Strict webview isolation: no network access, no local resource access,
+  images rendered only from in-memory `data:` URIs, nothing stored.

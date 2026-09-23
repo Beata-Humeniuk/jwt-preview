@@ -1,54 +1,9 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { claimValidityPill, escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from '../src/render';
+import { escapeHtml, formatSize, hexDump, jsonToHtml } from '../src/render';
 
-const NOW = 1700000000;
-
-test('claimValidityPill covers exp and nbf, ignores other keys', () => {
-  assert.ok(claimValidityPill('exp', NOW - 1, NOW).includes('expired'));
-  assert.ok(claimValidityPill('exp', NOW + 1, NOW).includes('valid'));
-  assert.ok(claimValidityPill('nbf', NOW + 1, NOW).includes('not yet active'));
-  assert.equal(claimValidityPill('nbf', NOW - 1, NOW), '');
-  assert.equal(claimValidityPill('iat', NOW, NOW), '');
-});
-
-test('large payload renders without hanging', () => {
-  const large: Record<string, string> = {};
-  for (let i = 0; i < 2000; i++) {
-    large['key' + i] = 'value-' + i;
-  }
-  const html = jsonToHtml(large, '');
-  assert.ok(html.includes('key1999'));
-  assert.ok(html.includes('value-1999'));
-});
-
-test('exp in the past renders expired pill, in the future renders valid pill', () => {
-  const expired = renderClaims({ exp: NOW - 60 }, NOW);
-  assert.ok(expired.includes('err'));
-  assert.ok(expired.includes('expired'));
-  const valid = renderClaims({ exp: NOW + 3600 }, NOW);
-  assert.ok(valid.includes('ok'));
-  assert.ok(valid.includes('valid'));
-});
-
-test('iat and nbf render, future nbf gets a warning pill', () => {
-  const html = renderClaims({ iat: NOW - 100, nbf: NOW + 100 }, NOW);
-  assert.ok(html.includes('iat'));
-  assert.ok(html.includes('nbf'));
-  assert.ok(html.includes('not yet active'));
-  const active = renderClaims({ nbf: NOW - 100 }, NOW);
-  assert.ok(!active.includes('not yet active'));
-});
-
-test('absent optional claims produce no claim rows', () => {
-  assert.equal(renderClaims({ custom: 'x' }, NOW), '');
-});
-
-test('aud renders both string and array forms', () => {
-  const single = renderClaims({ aud: 'api' }, NOW);
-  assert.ok(single.includes('api'));
-  const multi = renderClaims({ aud: ['api', 'web'] }, NOW);
-  assert.ok(multi.includes('api, web'));
+test('escapeHtml escapes all special characters', () => {
+  assert.equal(escapeHtml(`&<>"'`), '&amp;&lt;&gt;&quot;&#39;');
 });
 
 test('HTML injection in JSON keys and values is escaped', () => {
@@ -63,96 +18,49 @@ test('HTML injection in JSON keys and values is escaped', () => {
   assert.ok(html.includes('&lt;script&gt;'));
 });
 
-test('HTML injection in claim values is escaped', () => {
-  const html = renderClaims({
-    iss: '<script>alert(1)</script>',
-    sub: '"><b>x</b>',
-    aud: ['<i>a</i>', 'b']
-  }, NOW);
-  assert.ok(!html.includes('<script>'));
-  assert.ok(!html.includes('<b>'));
-  assert.ok(!html.includes('<i>'));
+test('JSON tree renders nested and empty containers', () => {
+  const html = jsonToHtml({ a: [1, 'x', null, true], b: {}, c: [] }, '');
+  assert.ok(html.includes('<details class="jnode" open>'));
+  assert.ok(html.includes('data-close="]"'));
+  assert.ok(html.includes('class="jnum">1<'));
+  assert.ok(html.includes('class="jstr">"x"<'));
+  assert.ok(html.includes('class="jlit">null<'));
+  assert.ok(html.includes('{}'));
+  assert.ok(html.includes('[]'));
 });
 
-test('escapeHtml escapes all special characters', () => {
-  assert.equal(escapeHtml(`&<>"'`), '&amp;&lt;&gt;&quot;&#39;');
+test('large JSON renders without hanging', () => {
+  const large: Record<string, string> = {};
+  for (let i = 0; i < 2000; i++) {
+    large['key' + i] = 'value-' + i;
+  }
+  const html = jsonToHtml(large, '');
+  assert.ok(html.includes('key1999'));
+  assert.ok(html.includes('value-1999'));
 });
 
-test('fmtDate formats epoch seconds as UTC', () => {
-  assert.equal(fmtDate(0), '1970-01-01 00:00:00 UTC');
+test('formatSize picks a readable unit', () => {
+  assert.equal(formatSize(0), '0 B');
+  assert.equal(formatSize(1023), '1023 B');
+  assert.equal(formatSize(1024), '1 KB');
+  assert.equal(formatSize(1536), '1.5 KB');
+  assert.equal(formatSize(12 * 1024), '12 KB');
+  assert.equal(formatSize(3 * 1024 * 1024 + 200 * 1024), '3.2 MB');
+  assert.equal(formatSize(5 * 1024 * 1024 * 1024), '5 GB');
 });
 
-test('plain view maps known claims to friendly labels', () => {
-  const html = renderPlain({ iss: 'https://auth.example.com', sub: 'user-42', alg: 'HS256' }, NOW);
-  assert.ok(html.includes('Issuer'));
-  assert.ok(html.includes('Subject'));
-  assert.ok(html.includes('Algorithm'));
-  assert.ok(html.includes('https://auth.example.com'));
+test('hexDump lays out 16 bytes per line with offsets and an ASCII column', () => {
+  const data = Uint8Array.from([...Buffer.from('Hello, world!'), 0x00, 0xff, 0x7f, 0x41, 0x42]);
+  const lines = hexDump(data, 4096).split('\n');
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0], '00000000  48 65 6c 6c 6f 2c 20 77  6f 72 6c 64 21 00 ff 7f  |Hello, world!...|');
+  assert.equal(lines[1], '00000010  41 42                                             |AB|');
 });
 
-test('plain view formats top-level timestamp claims as dates', () => {
-  const html = renderPlain({ exp: NOW + 3600 }, NOW);
-  assert.ok(html.includes('Expires'));
-  assert.ok(html.includes(fmtDate(NOW + 3600)));
-  assert.ok(html.includes('in 1 h'));
-  assert.ok(!html.includes(String(NOW + 3600)));
-});
-
-test('plain view shows validity pills on exp and future nbf', () => {
-  const valid = renderPlain({ exp: NOW + 3600 }, NOW);
-  assert.ok(valid.includes('pill ok'));
-  assert.ok(valid.includes('valid'));
-  const expired = renderPlain({ exp: NOW - 3600 }, NOW);
-  assert.ok(expired.includes('pill err'));
-  assert.ok(expired.includes('expired'));
-  const notYet = renderPlain({ nbf: NOW + 3600 }, NOW);
-  assert.ok(notYet.includes('pill warn'));
-  assert.ok(notYet.includes('not yet active'));
-  const activeNbf = renderPlain({ nbf: NOW - 3600 }, NOW);
-  assert.ok(!activeNbf.includes('pill'));
-});
-
-test('plain view renders booleans as yes/no and null as a dash', () => {
-  const html = renderPlain({ beta: true, legacy: false, note: null }, NOW);
-  assert.ok(html.includes('yes'));
-  assert.ok(html.includes('no'));
-  assert.ok(html.includes('—'));
-});
-
-test('plain view joins arrays of primitives with commas', () => {
-  const html = renderPlain({ aud: ['api', 'web'], roles: ['admin', 'editor'] }, NOW);
-  assert.ok(html.includes('api, web'));
-  assert.ok(html.includes('admin, editor'));
-});
-
-test('plain view renders nested objects as collapsible groups without friendly mapping', () => {
-  const html = renderPlain({ ctx: { sub: 'nested', org: { id: 7 } } }, NOW);
-  assert.ok(html.includes('<details class="pnode" open>'));
-  assert.ok(html.includes('<summary>'));
-  assert.ok(html.includes('ctx'));
-  assert.ok(html.includes('pkids'));
-  assert.ok(html.includes('>sub<'));
-  assert.ok(!html.includes('Subject'));
-  assert.ok(html.includes('7'));
-});
-
-test('plain view escapes HTML in keys and values', () => {
-  const html = renderPlain({ '<img src=x>': '<script>alert(1)</script>' }, NOW);
-  assert.ok(!html.includes('<script>'));
-  assert.ok(!html.includes('<img'));
-  assert.ok(html.includes('&lt;script&gt;'));
-});
-
-test('plain view handles empty objects and primitive roots', () => {
-  assert.ok(renderPlain({}, NOW).includes('(empty)'));
-  assert.ok(renderPlain('raw', NOW).includes('raw'));
-});
-
-test('relative time respects direction, units, and pluralization', () => {
-  assert.equal(fmtRel(NOW + 30, NOW), 'in 30 s');
-  assert.equal(fmtRel(NOW - 120, NOW), '2 min ago');
-  assert.equal(fmtRel(NOW + 86400, NOW), 'in 1 day');
-  assert.equal(fmtRel(NOW + 3 * 86400, NOW), 'in 3 days');
-  assert.equal(fmtRel(NOW - 31536000, NOW), '1 year ago');
-  assert.equal(fmtRel(NOW - 2 * 31536000, NOW), '2 years ago');
+test('hexDump stops at the byte limit and handles empty input', () => {
+  const data = new Uint8Array(100).fill(0x41);
+  const lines = hexDump(data, 32).split('\n');
+  assert.equal(lines.length, 2);
+  assert.ok(lines[1].startsWith('00000010'));
+  assert.equal(hexDump(new Uint8Array(0), 16), '');
 });

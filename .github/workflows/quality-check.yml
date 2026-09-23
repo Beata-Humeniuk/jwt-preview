@@ -46,8 +46,8 @@ jobs:
           node <<'NODE'
           const manifest = require('/tmp/extension-package.json');
           const expected = {
-            name: 'jwt-preview',
-            displayName: 'JWT Preview',
+            name: 'base64-preview',
+            displayName: 'Base64 Preview',
             publisher: 'beatahumeniuk',
             version: require('./package.json').version,
           };
