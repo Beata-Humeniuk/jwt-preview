@@ -1,10 +1,10 @@
 # JWT Preview
 
 A Visual Studio Code extension for viewing JWT token contents in a clear,
-readable format. Copy a token, paste one, or select one in the editor to
-inspect its Header and Payload as readable JSON, with standard claims
-formatted for quick reading. If you have the signing key, the panel can also
-check the signature — without sending anything anywhere.
+readable format. Copy a token or paste one to inspect its Header and Payload
+as readable JSON, with standard claims formatted for quick reading. If you have
+the signing key, the panel can also check the signature — without sending
+anything anywhere.
 
 ![The JWT Preview panel showing a decoded synthetic token](media/screenshot.png)
 
@@ -19,7 +19,7 @@ paste in leaves it. See [SECURITY.md](SECURITY.md) for the full scope.
 ## Features
 
 - Live decoding as you type or paste.
-- Picks up a token straight from the clipboard or the editor selection.
+- Picks up a token straight from the clipboard.
 - Header and Payload rendered as a collapsible JSON tree; the Signature
   segment is displayed as-is.
 - Standard claims formatted where present: `exp`, `iat`, `nbf`, `iss`, `sub`,
@@ -72,9 +72,10 @@ Copy a token, open the Command Palette (`Ctrl/Cmd+Shift+P`), and run
 **JWT: Open Preview**. If the clipboard holds something shaped like a JWT, it
 is decoded straight away; otherwise paste a token into the input field.
 
-To decode a token that is already in your editor: select it, right-click, and
-choose **JWT: Decode Selected Token**. With nothing selected, this command
-falls back to the clipboard as well.
+To decode a token you have just copied without leaving the editor: right-click
+anywhere in the editor and choose **JWT: Decode Token from Clipboard**. If the
+clipboard holds no JWT, the extension says so and opens the panel empty for you
+to paste into.
 
 To check a signature, paste the key or secret into the **Verify signature**
 field below the token; the result appears directly underneath it. Leaving that
