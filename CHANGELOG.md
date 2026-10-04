@@ -4,6 +4,20 @@ All notable, user-visible changes to JWT Preview are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **JWT: Decode Selected Token** is replaced by **JWT: Decode Token from
+  Clipboard**. The new command decodes whatever JWT is in the clipboard and is
+  available from the editor context menu regardless of the selection. If the
+  clipboard holds no JWT, a warning says so and the panel opens empty.
+
+### Removed
+
+- Decoding the editor selection. Copying a token and running either command
+  covers the same case with one step fewer.
+
 ## [1.3.0] - 2026-09-01
 
 ### Added

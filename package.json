@@ -49,16 +49,15 @@
         "category": "JWT"
       },
       {
-        "command": "jwtDecoder.decodeSelection",
-        "title": "Decode Selected Token",
+        "command": "jwtDecoder.decodeClipboard",
+        "title": "Decode Token from Clipboard",
         "category": "JWT"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "jwtDecoder.decodeSelection",
-          "when": "editorHasSelection",
+          "command": "jwtDecoder.decodeClipboard",
           "group": "navigation"
         }
       ]

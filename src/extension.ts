@@ -13,10 +13,12 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('jwtDecoder.open', async () => {
       openPanel(await tokenFromClipboard());
     }),
-    vscode.commands.registerCommand('jwtDecoder.decodeSelection', async () => {
-      const editor = vscode.window.activeTextEditor;
-      const selectedText = editor?.document.getText(editor.selection).trim();
-      openPanel(selectedText || (await tokenFromClipboard()));
+    vscode.commands.registerCommand('jwtDecoder.decodeClipboard', async () => {
+      const token = await tokenFromClipboard();
+      if (!token) {
+        void vscode.window.showWarningMessage('The clipboard does not contain a JWT. Copy a token and run the command again, or paste it into the panel.');
+      }
+      openPanel(token);
     })
   );
 }
