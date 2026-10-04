@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { splitSegments } from './token';
 
 export type VerifyStatus = 'valid' | 'invalid' | 'unsigned' | 'unsupported' | 'error';
 
@@ -46,6 +47,14 @@ const JWK_CURVE_BY_OPENSSL_CURVE: Record<string, string> = {
 const JWS_ECDSA_SIGNATURE_ENCODING = 'ieee-p1363';
 const PEM_HEADER_MARKER = '-----BEGIN';
 
+/** The parts of a token and key needed to check one signature. */
+interface SignatureCheck {
+  signingInput: Buffer;
+  signature: Buffer;
+  keyText: string;
+  kid: string | undefined;
+}
+
 function decodeHeader(segment: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(segment, 'base64url').toString('utf-8')) as Record<string, unknown>;
 }
@@ -59,7 +68,7 @@ function readKid(segment: string): string | undefined {
   try {
     const kid = decodeHeader(segment).kid;
     return typeof kid === 'string' ? kid : undefined;
-  } catch (e) {
+  } catch {
     return undefined;
   }
 }
@@ -149,29 +158,16 @@ function assertKeyTypeMatchesAlg(key: crypto.KeyObject, alg: string, spec: Algor
   }
 }
 
-function hmacMatches(
-  spec: AlgorithmSpec,
-  signingInput: Buffer,
-  signature: Buffer,
-  keyText: string,
-  kid: string | undefined,
-  options: VerifyOptions
-): boolean {
-  const secret = toHmacSecret(keyText, kid, options);
-  const expected = crypto.createHmac(spec.digest as string, secret).update(signingInput).digest();
-  return expected.length === signature.length && crypto.timingSafeEqual(expected, signature);
+function hmacMatches(spec: AlgorithmSpec, check: SignatureCheck, options: VerifyOptions): boolean {
+  const secret = toHmacSecret(check.keyText, check.kid, options);
+  const expected = crypto.createHmac(spec.digest as string, secret).update(check.signingInput).digest();
+  return expected.length === check.signature.length && crypto.timingSafeEqual(expected, check.signature);
 }
 
-function asymmetricSignatureMatches(
-  alg: string,
-  spec: AlgorithmSpec,
-  signingInput: Buffer,
-  signature: Buffer,
-  keyText: string,
-  kid: string | undefined
-): boolean {
-  const key = toPublicKey(keyText, kid);
+function asymmetricSignatureMatches(alg: string, spec: AlgorithmSpec, check: SignatureCheck): boolean {
+  const key = toPublicKey(check.keyText, check.kid);
   assertKeyTypeMatchesAlg(key, alg, spec);
+  const { signingInput, signature } = check;
 
   if (spec.family === 'eddsa') {
     return crypto.verify(null, signingInput, key, signature);
@@ -193,15 +189,15 @@ export function verifySignature(token: string, keyText: string, options: VerifyO
     return { status: 'error', message: 'No key or secret provided.' };
   }
 
-  const parts = token.trim().split('.');
-  if (parts.length < 2 || parts.length > 3) {
+  const parts = splitSegments(token);
+  if (!parts) {
     return { status: 'error', message: 'This does not look like a JWT.' };
   }
 
   let alg: string | undefined;
   try {
     alg = readAlg(parts[0]);
-  } catch (e) {
+  } catch {
     return { status: 'error', message: 'The token header could not be read.' };
   }
   if (alg === undefined) {
@@ -224,14 +220,17 @@ export function verifySignature(token: string, keyText: string, options: VerifyO
     return { status: 'unsupported', alg, message: 'Signature algorithm "' + alg + '" is not supported.' };
   }
 
-  const signingInput = Buffer.from(parts[0] + '.' + parts[1], 'utf-8');
-  const signature = Buffer.from(parts[2], 'base64url');
-  const kid = readKid(parts[0]);
+  const check: SignatureCheck = {
+    signingInput: Buffer.from(parts[0] + '.' + parts[1], 'utf-8'),
+    signature: Buffer.from(parts[2], 'base64url'),
+    keyText: trimmedKey,
+    kid: readKid(parts[0])
+  };
 
   try {
     const matches = spec.family === 'hmac'
-      ? hmacMatches(spec, signingInput, signature, trimmedKey, kid, options)
-      : asymmetricSignatureMatches(alg, spec, signingInput, signature, trimmedKey, kid);
+      ? hmacMatches(spec, check, options)
+      : asymmetricSignatureMatches(alg, spec, check);
     return matches
       ? { status: 'valid', alg }
       : { status: 'invalid', alg, message: 'The signature does not match this key.' };
