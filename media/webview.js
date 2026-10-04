@@ -1,23 +1,34 @@
-const input = document.getElementById('input');
-const errorBox = document.getElementById('error');
-const result = document.getElementById('result');
+// Runs inside the webview, after the shared functions from src/render.ts and
+// src/token.ts that the extension host prepends to this file.
+
+const inputEl = document.getElementById('input');
+const errorEl = document.getElementById('error');
+const resultEl = document.getElementById('result');
 const headerEl = document.getElementById('header');
 const payloadEl = document.getElementById('payload');
 const headerPlainEl = document.getElementById('header-plain');
 const payloadPlainEl = document.getElementById('payload-plain');
 const signatureEl = document.getElementById('signature');
 const claimsEl = document.getElementById('claims');
-const viewMode = document.getElementById('viewmode');
+const viewModeEl = document.getElementById('viewmode');
 const keyEl = document.getElementById('key');
 const b64El = document.getElementById('b64secret');
-const b64Wrap = document.getElementById('b64wrap');
+const b64WrapEl = document.getElementById('b64wrap');
 const verifyAlgEl = document.getElementById('verify-alg');
 const verifyResultEl = document.getElementById('verify-result');
 const verifyIconEl = document.getElementById('verify-icon');
 const verifyHeadlineEl = document.getElementById('verify-headline');
 const verifyMsgEl = document.getElementById('verify-msg');
 const vscode = acquireVsCodeApi();
+
+const sectionBoxes = {
+  header: [headerEl, headerPlainEl],
+  payload: [payloadEl, payloadPlainEl]
+};
+
 let currentStrs = { header: '', payload: '' };
+// Incremented on every verify request and on every re-decode, so a late
+// answer to an outdated request is ignored.
 let verifySeq = 0;
 
 const VERIFY_LABELS = {
@@ -29,20 +40,28 @@ const VERIFY_LABELS = {
   error: { text: 'Cannot check', cls: 'warn', icon: '!' }
 };
 
-function setVerifyStatus(result) {
-  if (!result) {
+function parseJsonOrUndefined(jsonStr) {
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return undefined;
+  }
+}
+
+function setVerifyStatus(status) {
+  if (!status) {
     verifyResultEl.className = 'verify-result hidden';
     return;
   }
-  const label = VERIFY_LABELS[result.status] || VERIFY_LABELS.error;
+  const label = VERIFY_LABELS[status.status] || VERIFY_LABELS.error;
   verifyResultEl.className = 'verify-result ' + label.cls;
   verifyIconEl.textContent = label.icon;
   verifyHeadlineEl.textContent = label.text;
-  verifyMsgEl.textContent = result.message || '';
+  verifyMsgEl.textContent = status.message || '';
 }
 
 function requestVerify() {
-  const token = input.value.trim();
+  const token = inputEl.value.trim();
   const key = keyEl.value.trim();
   const requestId = ++verifySeq;
   if (!token || !key) {
@@ -53,113 +72,112 @@ function requestVerify() {
   vscode.postMessage({ type: 'verify', requestId, token, key, base64Secret: b64El.checked });
 }
 
-function renderJsonInto(el, jsonStr) {
-  try {
-    el.innerHTML = jsonToHtml(JSON.parse(jsonStr), '');
-  } catch (e) {
+function renderInto(el, jsonStr, render) {
+  const value = parseJsonOrUndefined(jsonStr);
+  if (value === undefined) {
     el.textContent = jsonStr;
-  }
-}
-
-function renderPlainInto(el, jsonStr, now) {
-  try {
-    el.innerHTML = renderPlain(JSON.parse(jsonStr), now);
-  } catch (e) {
-    el.textContent = jsonStr;
+  } else {
+    el.innerHTML = render(value);
   }
 }
 
 function showError(msg) {
-  errorBox.textContent = msg;
-  errorBox.classList.remove('hidden');
-  result.classList.add('hidden');
+  errorEl.textContent = msg;
+  errorEl.classList.remove('hidden');
+  resultEl.classList.add('hidden');
+}
+
+function resetVerification() {
+  verifyAlgEl.textContent = '';
+  b64WrapEl.classList.add('hidden');
+  setVerifyStatus(null);
+  verifySeq++;
+}
+
+function renderDecoded(parsed) {
+  const now = Math.floor(Date.now() / 1000);
+  currentStrs = { header: parsed.headerStr, payload: parsed.payloadStr };
+
+  renderInto(headerEl, parsed.headerStr, value => jsonToHtml(value, ''));
+  renderInto(payloadEl, parsed.payloadStr, value => jsonToHtml(value, ''));
+  renderInto(headerPlainEl, parsed.headerStr, value => renderPlain(value, now));
+  renderInto(payloadPlainEl, parsed.payloadStr, value => renderPlain(value, now));
+  signatureEl.textContent = parsed.signature || '(no signature)';
+
+  const payload = parseJsonOrUndefined(parsed.payloadStr);
+  claimsEl.innerHTML = payload && typeof payload === 'object' ? renderClaims(payload, now) : '';
+
+  const header = parseJsonOrUndefined(parsed.headerStr);
+  const alg = header && typeof header.alg === 'string' ? header.alg : '';
+  verifyAlgEl.textContent = alg;
+  b64WrapEl.classList.toggle('hidden', !alg.startsWith('HS'));
+  requestVerify();
+
+  errorEl.classList.add('hidden');
+  resultEl.classList.remove('hidden');
 }
 
 function decode() {
-  const parsed = parseToken(input.value);
-  verifyAlgEl.textContent = '';
-  b64Wrap.classList.add('hidden');
-  setVerifyStatus(null);
-  verifySeq++;
-  if (parsed.kind === 'empty') {
-    errorBox.classList.add('hidden');
-    result.classList.add('hidden');
-    return;
+  const parsed = parseToken(inputEl.value);
+  resetVerification();
+  switch (parsed.kind) {
+    case 'empty':
+      errorEl.classList.add('hidden');
+      resultEl.classList.add('hidden');
+      break;
+    case 'invalid':
+      showError("This doesn't look like a JWT — expected 2–3 parts separated by a dot.");
+      break;
+    case 'error':
+      showError('Failed to decode the token: ' + parsed.message);
+      break;
+    default:
+      renderDecoded(parsed);
   }
-  if (parsed.kind === 'invalid') {
-    showError("This doesn't look like a JWT — expected 2–3 parts separated by a dot.");
-    return;
-  }
-  if (parsed.kind === 'error') {
-    showError('Failed to decode the token: ' + parsed.message);
-    return;
-  }
-  currentStrs = { header: parsed.headerStr, payload: parsed.payloadStr };
-  const now = Math.floor(Date.now() / 1000);
-  renderJsonInto(headerEl, parsed.headerStr);
-  renderJsonInto(payloadEl, parsed.payloadStr);
-  renderPlainInto(headerPlainEl, parsed.headerStr, now);
-  renderPlainInto(payloadPlainEl, parsed.payloadStr, now);
-  signatureEl.textContent = parsed.signature || '(no signature)';
-
-  let claimsHtml = '';
-  try { claimsHtml = renderClaims(JSON.parse(parsed.payloadStr), now); } catch (e) {}
-  claimsEl.innerHTML = claimsHtml;
-
-  let alg = '';
-  try {
-    const header = JSON.parse(parsed.headerStr);
-    if (typeof header.alg === 'string') { alg = header.alg; }
-  } catch (e) {}
-  verifyAlgEl.textContent = alg;
-  b64Wrap.classList.toggle('hidden', alg.slice(0, 2) !== 'HS');
-  requestVerify();
-
-  errorBox.classList.add('hidden');
-  result.classList.remove('hidden');
 }
 
-const sectionBoxes = {
-  header: [headerEl, headerPlainEl],
-  payload: [payloadEl, payloadPlainEl]
-};
+function formatForCopy(jsonStr) {
+  const value = parseJsonOrUndefined(jsonStr);
+  return value === undefined ? jsonStr : JSON.stringify(value, null, 2);
+}
+
 document.querySelectorAll('button.mini[data-target]').forEach(btn => {
   btn.addEventListener('click', () => {
+    const open = btn.dataset.open === 'true';
     sectionBoxes[btn.dataset.target].forEach(box => {
-      box.querySelectorAll('details').forEach(d => { d.open = btn.dataset.open === 'true'; });
+      box.querySelectorAll('details').forEach(details => { details.open = open; });
     });
   });
 });
 
 document.querySelectorAll('button.copybtn').forEach(btn => {
   btn.addEventListener('click', async () => {
-    const raw = currentStrs[btn.dataset.copy];
-    let text = raw;
-    try { text = JSON.stringify(JSON.parse(raw), null, 2); } catch (e) {}
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(formatForCopy(currentStrs[btn.dataset.copy]));
       btn.classList.add('copied');
       setTimeout(() => btn.classList.remove('copied'), 1500);
-    } catch (e) {}
+    } catch {
+      // Clipboard access denied: the button simply does not flash as copied.
+    }
   });
 });
 
-viewMode.addEventListener('change', () => {
-  result.classList.toggle('plain-mode', viewMode.checked);
+viewModeEl.addEventListener('change', () => {
+  resultEl.classList.toggle('plain-mode', viewModeEl.checked);
 });
 
-input.addEventListener('input', decode);
+inputEl.addEventListener('input', decode);
 document.getElementById('clear').addEventListener('click', () => {
-  input.value = '';
+  inputEl.value = '';
   decode();
-  input.focus();
+  inputEl.focus();
 });
 document.getElementById('paste').addEventListener('click', async () => {
   try {
     const text = await navigator.clipboard.readText();
-    input.value = text.trim();
+    inputEl.value = text.trim();
     decode();
-  } catch (e) {
+  } catch {
     showError('No clipboard access — paste the token manually (Ctrl/Cmd+V).');
   }
 });
@@ -172,16 +190,18 @@ document.getElementById('clearkey').addEventListener('click', () => {
   keyEl.focus();
 });
 
-window.addEventListener('message', (event) => {
+window.addEventListener('message', event => {
   const msg = event.data;
-  if (msg && msg.type === 'setToken') {
-    input.value = msg.token;
-    decode();
+  if (!msg) {
+    return;
   }
-  if (msg && msg.type === 'verifyResult' && msg.requestId === verifySeq) {
+  if (msg.type === 'setToken') {
+    inputEl.value = msg.token;
+    decode();
+  } else if (msg.type === 'verifyResult' && msg.requestId === verifySeq) {
     setVerifyStatus(msg.result);
   }
 });
 
 decode();
-input.focus();
+inputEl.focus();

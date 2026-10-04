@@ -2,9 +2,15 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { claimValidityPill, escapeHtml, fmtDate, fmtRel, jsonToHtml, renderClaims, renderPlain } from './render';
-import { base64UrlDecode, looksLikeJwt, parseToken } from './token';
+import { escapeHtml } from './render';
+import { sharedWebviewSource } from './shared';
+import { looksLikeJwt } from './token';
 import { verifySignature } from './verify';
+
+const PANEL_VIEW_TYPE = 'jwtDecoder';
+const PANEL_TITLE = 'JWT Preview';
+const NO_JWT_IN_CLIPBOARD =
+  'The clipboard does not contain a JWT. Copy a token and run the command again, or paste it into the panel.';
 
 let panel: vscode.WebviewPanel | undefined;
 
@@ -16,7 +22,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('jwtDecoder.decodeClipboard', async () => {
       const token = await tokenFromClipboard();
       if (!token) {
-        void vscode.window.showWarningMessage('The clipboard does not contain a JWT. Copy a token and run the command again, or paste it into the panel.');
+        void vscode.window.showWarningMessage(NO_JWT_IN_CLIPBOARD);
       }
       openPanel(token);
     })
@@ -24,10 +30,8 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  if (panel) {
-    panel.dispose();
-    panel = undefined;
-  }
+  panel?.dispose();
+  panel = undefined;
 }
 
 async function tokenFromClipboard(): Promise<string | undefined> {
@@ -39,32 +43,30 @@ async function tokenFromClipboard(): Promise<string | undefined> {
   }
 }
 
-function openPanel(initialToken?: string) {
-  if (panel) {
-    panel.reveal(vscode.ViewColumn.Beside);
-    if (initialToken) {
-      panel.webview.postMessage({ type: 'setToken', token: initialToken });
-    }
-  } else {
-    panel = vscode.window.createWebviewPanel(
-      'jwtDecoder',
-      'JWT Preview',
-      vscode.ViewColumn.Beside,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: []
-      }
-    );
-    panel.iconPath = vscode.Uri.file(path.join(__dirname, '..', 'media', 'icon.png'));
-    panel.webview.html = getHtml(initialToken);
-    panel.webview.onDidReceiveMessage((message: unknown) => {
-      handleWebviewMessage(message);
-    });
-    panel.onDidDispose(() => {
-      panel = undefined;
-    });
+function openPanel(initialToken?: string): void {
+  if (!panel) {
+    panel = createPanel(initialToken);
+    return;
   }
+  panel.reveal(vscode.ViewColumn.Beside);
+  if (initialToken) {
+    panel.webview.postMessage({ type: 'setToken', token: initialToken });
+  }
+}
+
+function createPanel(initialToken?: string): vscode.WebviewPanel {
+  const created = vscode.window.createWebviewPanel(PANEL_VIEW_TYPE, PANEL_TITLE, vscode.ViewColumn.Beside, {
+    enableScripts: true,
+    retainContextWhenHidden: true,
+    localResourceRoots: []
+  });
+  created.iconPath = vscode.Uri.file(mediaPath('icon.png'));
+  created.webview.html = getHtml(initialToken);
+  created.webview.onDidReceiveMessage(handleWebviewMessage);
+  created.onDidDispose(() => {
+    panel = undefined;
+  });
+  return created;
 }
 
 interface VerifyRequest {
@@ -95,12 +97,16 @@ function handleWebviewMessage(message: unknown): void {
   panel?.webview.postMessage({ type: 'verifyResult', requestId: request.requestId, result });
 }
 
+function mediaPath(name: string): string {
+  return path.join(__dirname, '..', 'media', name);
+}
+
 const mediaCache = new Map<string, string>();
 
 function readMediaFile(name: string): string {
   let content = mediaCache.get(name);
   if (content === undefined) {
-    content = fs.readFileSync(path.join(__dirname, '..', 'media', name), 'utf8');
+    content = fs.readFileSync(mediaPath(name), 'utf8');
     mediaCache.set(name, content);
   }
   return content;
@@ -108,23 +114,6 @@ function readMediaFile(name: string): string {
 
 function renderTemplate(template: string, values: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => values[key] ?? '');
-}
-
-const SHARED_WEBVIEW_FUNCTIONS = [
-  escapeHtml,
-  base64UrlDecode,
-  parseToken,
-  jsonToHtml,
-  fmtDate,
-  fmtRel,
-  claimValidityPill,
-  renderClaims,
-  renderPlain
-];
-
-function getWebviewScript(): string {
-  const sharedSources = SHARED_WEBVIEW_FUNCTIONS.map(fn => fn.toString()).join('\n\n');
-  return sharedSources + '\n\n' + readMediaFile('webview.js');
 }
 
 function getNonce(): string {
@@ -145,7 +134,7 @@ export function getHtml(initialToken?: string): string {
     csp,
     nonce,
     styles: readMediaFile('webview.css'),
-    script: getWebviewScript(),
+    script: sharedWebviewSource() + '\n\n' + readMediaFile('webview.js'),
     initialToken: initialToken ? escapeHtml(initialToken) : ''
   });
 }

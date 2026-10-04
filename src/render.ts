@@ -1,56 +1,79 @@
+// Every exported function here is also serialized into the webview, so each
+// must stay self-contained — see SHARED_WEBVIEW_FUNCTIONS in shared.ts.
+
 export function escapeHtml(s: unknown): string {
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  const entities: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  return String(s).replace(/[&<>"']/g, c => entities[c]);
 }
 
 export function jsonToHtml(value: unknown, keyHtml: string): string {
-  if (value === null || typeof value !== 'object') {
-    const isString = typeof value === 'string';
-    const cls = isString ? 'jstr' : (typeof value === 'number' ? 'jnum' : 'jlit');
-    const text = isString ? '"' + escapeHtml(value) + '"' : escapeHtml(String(value));
-    return '<div class="jrow">' + keyHtml + '<span class="' + cls + '">' + text + '</span></div>';
+  function primitiveHtml(primitive: unknown): string {
+    if (typeof primitive === 'string') {
+      return '<span class="jstr">"' + escapeHtml(primitive) + '"</span>';
+    }
+    const cls = typeof primitive === 'number' ? 'jnum' : 'jlit';
+    return '<span class="' + cls + '">' + escapeHtml(String(primitive)) + '</span>';
   }
-  const isArr = Array.isArray(value);
-  const open = isArr ? '[' : '{';
-  const close = isArr ? ']' : '}';
-  const entries: Array<[string | null, unknown]> = isArr
-    ? (value as unknown[]).map(v => [null, v] as [null, unknown])
-    : Object.entries(value as Record<string, unknown>);
-  if (entries.length === 0) {
+
+  if (value === null || typeof value !== 'object') {
+    return '<div class="jrow">' + keyHtml + primitiveHtml(value) + '</div>';
+  }
+
+  const isArray = Array.isArray(value);
+  const open = isArray ? '[' : '{';
+  const close = isArray ? ']' : '}';
+  const children: string[] = isArray
+    ? (value as unknown[]).map(item => jsonToHtml(item, ''))
+    : Object.entries(value as Record<string, unknown>)
+        .map(([key, item]) => jsonToHtml(item, '<span class="jkey">"' + escapeHtml(key) + '"</span>: '));
+
+  if (children.length === 0) {
     return '<div class="jrow">' + keyHtml + open + close + '</div>';
   }
-  const inner = entries.map(([k, v]) =>
-    jsonToHtml(v, k === null ? '' : '<span class="jkey">"' + escapeHtml(k) + '"</span>: ')
-  ).join('');
   return '<details class="jnode" open>' +
     '<summary data-close="' + close + '">' + keyHtml + open + '</summary>' +
-    '<div class="jkids">' + inner + '</div>' +
+    '<div class="jkids">' + children.join('') + '</div>' +
     '<div class="jrow">' + close + '</div>' +
     '</details>';
 }
 
 export function fmtDate(sec: number): string {
   try {
-    const d = new Date(sec * 1000);
-    return d.toISOString().replace('T', ' ').replace('.000Z', ' UTC');
-  } catch (e) { return String(sec); }
+    return new Date(sec * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC');
+  } catch {
+    return String(sec);
+  }
 }
 
 export function fmtRel(sec: number, now: number): string {
-  let d = sec - now;
-  const future = d >= 0;
-  d = Math.abs(d);
-  let txt;
-  if (d < 60) { txt = d + ' s'; }
-  else if (d < 3600) { txt = Math.round(d / 60) + ' min'; }
-  else if (d < 86400) { txt = Math.round(d / 3600) + ' h'; }
-  else if (d < 31536000) {
-    const days = Math.round(d / 86400);
-    txt = days + (days === 1 ? ' day' : ' days');
+  const MINUTE = 60;
+  const HOUR = 60 * MINUTE;
+  const DAY = 24 * HOUR;
+  const YEAR = 365 * DAY;
+
+  const delta = sec - now;
+  const distance = Math.abs(delta);
+  let text: string;
+  if (distance < MINUTE) {
+    text = distance + ' s';
+  } else if (distance < HOUR) {
+    text = Math.round(distance / MINUTE) + ' min';
+  } else if (distance < DAY) {
+    text = Math.round(distance / HOUR) + ' h';
+  } else if (distance < YEAR) {
+    const days = Math.round(distance / DAY);
+    text = days + (days === 1 ? ' day' : ' days');
   } else {
-    const y = Math.round(d / 31536000);
-    txt = y + (y === 1 ? ' year' : ' years');
+    const years = Math.round(distance / YEAR);
+    text = years + (years === 1 ? ' year' : ' years');
   }
-  return future ? 'in ' + txt : txt + ' ago';
+  return delta >= 0 ? 'in ' + text : text + ' ago';
 }
 
 export function claimValidityPill(key: string, value: number, now: number): string {
@@ -71,23 +94,28 @@ export function renderClaims(payloadObj: Record<string, unknown>, now: number): 
       '<span class="claim-name">' + label + '</span>' +
       '<span class="claim-val">' + valueHtml + '</span></div>');
   }
-  function dateVal(sec: number): string {
-    return fmtDate(sec) + ' <span class="claim-sub">(' + fmtRel(sec, now) + ')</span>';
+  function dateRow(key: string, label: string): void {
+    const value = payloadObj[key];
+    if (typeof value === 'number') {
+      row(key, label, fmtDate(value) + ' <span class="claim-sub">(' + fmtRel(value, now) + ')</span>' +
+        claimValidityPill(key, value, now));
+    }
+  }
+  function textRow(key: string, label: string): void {
+    const value = payloadObj[key];
+    if (value !== undefined) {
+      row(key, label, escapeHtml(String(value)));
+    }
   }
 
-  if (typeof payloadObj.exp === 'number') {
-    row('exp', 'expires', dateVal(payloadObj.exp) + claimValidityPill('exp', payloadObj.exp, now));
-  }
-  if (typeof payloadObj.iat === 'number') {
-    row('iat', 'issued', dateVal(payloadObj.iat));
-  }
-  if (typeof payloadObj.nbf === 'number') {
-    row('nbf', 'valid from', dateVal(payloadObj.nbf) + claimValidityPill('nbf', payloadObj.nbf, now));
-  }
-  if (payloadObj.iss !== undefined) { row('iss', 'issuer', escapeHtml(String(payloadObj.iss))); }
-  if (payloadObj.sub !== undefined) { row('sub', 'subject', escapeHtml(String(payloadObj.sub))); }
-  if (payloadObj.aud !== undefined) {
-    row('aud', 'audience', escapeHtml(Array.isArray(payloadObj.aud) ? payloadObj.aud.join(', ') : String(payloadObj.aud)));
+  dateRow('exp', 'expires');
+  dateRow('iat', 'issued');
+  dateRow('nbf', 'valid from');
+  textRow('iss', 'issuer');
+  textRow('sub', 'subject');
+  const aud = payloadObj.aud;
+  if (aud !== undefined) {
+    row('aud', 'audience', escapeHtml(Array.isArray(aud) ? aud.join(', ') : String(aud)));
   }
 
   return rows.length ? '<div class="claims-box">' + rows.join('') + '</div>' : '';
@@ -107,6 +135,7 @@ export function renderPlain(value: unknown, now: number): string {
     nbf: 'Valid from',
     jti: 'Token ID'
   };
+  const dateClaims = ['exp', 'iat', 'nbf'];
 
   function fmtValue(v: unknown): string {
     if (v === null || v === undefined) { return '—'; }
@@ -128,6 +157,11 @@ export function renderPlain(value: unknown, now: number): string {
     return v === null || typeof v !== 'object';
   }
 
+  function dateRow(label: string, key: string, sec: number): string {
+    return row(label, escapeHtml(fmtDate(sec)) +
+      ' <span class="psub">(' + escapeHtml(fmtRel(sec, now)) + ')</span>' + claimValidityPill(key, sec, now));
+  }
+
   function renderEntries(obj: unknown, topLevel: boolean): string {
     if (isPrimitive(obj)) {
       return row('value', escapeHtml(fmtValue(obj)));
@@ -140,9 +174,8 @@ export function renderPlain(value: unknown, now: number): string {
     }
     return entries.map(([k, v]) => {
       const label = topLevel ? (friendlyNames[k] || k) : k;
-      if (topLevel && typeof v === 'number' && (k === 'exp' || k === 'iat' || k === 'nbf')) {
-        return row(label, escapeHtml(fmtDate(v)) +
-          ' <span class="psub">(' + escapeHtml(fmtRel(v, now)) + ')</span>' + claimValidityPill(k, v, now));
+      if (topLevel && typeof v === 'number' && dateClaims.includes(k)) {
+        return dateRow(label, k, v);
       }
       if (Array.isArray(v) && v.every(isPrimitive)) {
         return row(label, escapeHtml(v.map(fmtValue).join(', ')));
