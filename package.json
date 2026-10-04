@@ -2,7 +2,7 @@
   "name": "jwt-preview",
   "displayName": "JWT Preview",
   "description": "A clear, readable view of JWT token contents.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "beatahumeniuk",
   "license": "MIT",
   "author": {
